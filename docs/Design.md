@@ -57,27 +57,39 @@ mutates state.
 
 ### 2.3 State model
 
-`GameState` is an immutable value. `apply(state, action) -> Result<GameState, Rejection>` is the
-only way state changes. Human input and AI produce the same `Action` types. Events (battle
-results, conquests, eliminations) are returned alongside the new state so the UI can animate them.
+`GameState` (package `core.rules`) is an immutable value: the map, the kingdoms, one `Holding`
+(owner, armies, fresh armies) per province, round, current kingdom, winner, and a `draws`
+counter. `Rules.apply(state, action)` is the only way state changes; it returns
+`Outcome.Applied(state, events)` or `Outcome.Rejected(reason)`. Human input and AI produce the
+same `Action`s (`Move(from, to, armies?)`, `EndTurn`). Events (moves, battles, eliminations,
+round ends, turn starts, victory) come back with the new state so the UI can describe and
+animate them.
+
+Each battle draws from `Random(mix(seed, draws))` and increments `draws`, so a state plus an
+action always yields the same next state, and the state stays a plain serializable value.
 
 ## 3. The map
 
 ### 3.1 Generation pipeline
 
-1. **Points.** Poisson-disc sampling inside the map rectangle, then 1–2 rounds of Lloyd
-   relaxation so provinces are similar in size.
-2. **Voronoi.** Delaunay triangulation (Bowyer–Watson) → Voronoi cells, clipped to the rectangle.
-3. **Land and sea.** A land mask from low-frequency noise with a radial falloff gives an island or
-   small continent. Cells under the mask threshold are sea. The land graph must be connected; if
-   it is not, the generator retries with the next seed.
-4. **Irregular borders.** Each shared Voronoi edge is replaced by a noisy polyline (recursive
-   midpoint displacement). The polyline is generated **once per edge**, seeded from the two
-   province ids, and used by both provinces — so neighbours always share the exact same border.
-   Displacement is bounded to the quad formed by the edge endpoints and the two province sites, so
-   borders never cross each other or self-intersect.
+1. **Points.** Best-candidate (Mitchell) sampling inside the map rectangle — blue noise with an
+   exact point count — then 2 rounds of Lloyd relaxation so cells are similar in size.
+2. **Voronoi.** Each cell is the rectangle clipped by the perpendicular bisector to every other
+   site, nearest first, stopping once no bisector can reach it. Corners computed by neighbouring
+   cells are snapped into one shared vertex table (snap distance 1% of cell spacing, which also
+   collapses near-zero edges); every interior edge must then appear in both cells.
+3. **Land and sea.** Cells touching the map edge are always sea. Land grows from the
+   best-scoring interior cell, each step adding the best-scoring interior cell adjacent to the
+   land so far, until it has exactly `landProvinces` cells. Score is low-frequency value noise
+   minus a radial falloff, giving one irregular island. Land is connected by construction.
+4. **Irregular borders.** Every edge touching land becomes a noisy polyline, generated **once
+   per edge** from a seed mixed from the map seed and the two cell ids, and used by both sides —
+   so neighbours always share the exact same border. The path subdivides recursively inside a
+   convex quad whose controls stay within the fan triangles (edge + site) of the two convex cells,
+   so borders never cross each other or self-intersect, and each site stays inside its province.
 5. **Terrain** assigned per province (§3.3), **features** per border (§3.4).
-6. **Starting positions** (§4.1).
+
+Starting positions are a rule, not geometry (§4.1).
 
 Map size and province count come from `MapConfig` (§3.5).
 
@@ -99,10 +111,11 @@ gives no defence bonus — only border features do (§3.4).
 | Forest | Timber | 1 | |
 | Mountains | Ore | 1 | |
 | Marsh | Peat | 1 | |
-| Coast | Fish | 1 | Any land province bordering sea |
 
-Coast is a terrain (not a modifier) only when the province would otherwise be plains; otherwise
-the province keeps its terrain and is drawn with a shoreline.
+**Coastal** is an attribute, not a terrain: a province bordering the sea (any sea, including an
+enclosed inland sea) keeps its own terrain, also produces Fish, and gains **+1 yield**. Coastal
+plains grow 3 per round, other coastal provinces 2, inland non-plains 1 — harbour provinces are
+the rich ones, as most large cities are on the coast.
 
 ### 3.4 Border features
 
@@ -132,9 +145,16 @@ offered to the player on the new-game screen.
 | --- | --- |
 | `seed` | Map seed |
 | `landProvinces` | Target number of land provinces |
-| `width`, `height` | Map rectangle; derived from `landProvinces` when not given, so province size stays constant and the map grows |
-| `seaFraction` | Share of cells that become sea (default ≈0.35) |
+| `seaFraction` | Share of the interior cells (not touching the map edge) that stay sea (default 0.35) |
 | `featureFraction` | Share of land borders that carry a feature (default ≈0.33) |
+
+The map rectangle is derived, not configured: the generator picks enough cells for the land, the
+interior sea and an edge ring of sea, at a constant 10 000 units² per cell and a 3:2 aspect, so
+province size stays constant and the map grows with the count.
+
+Terrain is assigned by quota over two noise fields. Elevation is noise plus distance from the
+sea, so the top 12% become mountains and the next 18% hills. Of the rest, the wettest 12% become
+marsh and the next 22% forest. The remainder is plains.
 
 Player-facing presets (for 4 kingdoms): **Small** 18, **Medium** 28 (default), **Large** 40 land
 provinces, plus a custom count. The generator rejects a config with fewer than 3 land provinces per
@@ -145,15 +165,28 @@ count matches.
 
 ### 4.1 Setup
 
-- 2–6 kingdoms; default 4 (player + 3 AI).
-- Each kingdom starts with one **capital** province and its nearest 1–2 neighbours, spread so
-  capitals are far apart (farthest-point placement over graph distance). Remaining provinces are
-  **neutral** with 1–3 armies. Neutral provinces do not grow.
-- Each owned province starts with 2 armies; the capital with 5.
+- 2–6 kingdoms; default 4 (player + 3 AI). Kingdom 0 is the human player.
+- Each kingdom starts with a **capital** and two neighbouring provinces. The setup tries 80
+  candidate layouts — farthest-point capitals over graph distance from a random first pick, one
+  refinement pass, then starting neighbours claimed in passes where the poorest kingdom picks
+  first and takes the richest province next to its capital — and keeps the one with the smallest
+  spread in starting growth among those at most one step less spread out than the best.
+- Territories are dealt to seats at random, so turn order says nothing about map position.
+- Each owned province starts with 2 armies, the capital with 5. A kingdom whose starting growth
+  is below the best gets **3 rounds of its shortfall** as extra capital armies.
+- Remaining provinces are **neutral** with 1–3 armies. Neutral provinces do not grow.
 
 ### 4.2 Round and turn
 
-A **round** is every living kingdom taking one turn, the player first, then AI in fixed order.
+A **round** is every living kingdom taking one turn. In round 1 the order is by kingdom id, so
+the player moves first. From round 2 the order follows the game's `TurnOrder` (see §11):
+
+| TurnOrder | Order each round |
+| --- | --- |
+| Fixed | By kingdom id, every round |
+| Rotating | The starting kingdom moves one seat each round |
+| Shuffled | A fresh random order each round, from the game seed |
+
 At the end of the round, provinces grow (§4.5).
 
 During its turn a kingdom performs any number of **moves**, then ends the turn.
@@ -163,7 +196,7 @@ During its turn a kingdom performs any number of **moves**, then ends the turn.
 The player taps a source province they own, then an adjacent target.
 
 - **Amount.** By default all *surplus* armies move — everything except 1, which always stays
-  behind. Long-press / secondary click on the target opens an amount picker instead.
+  behind. Long-press on the target (touch or mouse) opens an amount picker instead.
 - **Fatigue.** Each army moves at most once per turn. A province tracks how many of its armies
   are fresh; armies that arrive (by transfer or conquest) are fatigued until the kingdom's next
   turn. This prevents one stack crossing the whole map in a turn.
@@ -199,8 +232,8 @@ in `core`, not a separate approximation).
 
 ### 4.5 Growth
 
-Armies are home-grown. At the end of each round every owned province gains its terrain yield
-(§3.3) in armies, in place. There is no reinforcement pool and no placement step.
+Armies are home-grown. At the end of each round every owned province gains its yield
+(§3.3: terrain yield, +1 if coastal) in armies, in place. There is no reinforcement pool and no placement step.
 
 - Every terrain yields at least 1, so a living kingdom always gains at least one army per round.
 - There is no per-province cap.
@@ -216,27 +249,37 @@ eliminated the game ends in defeat.
 
 ## 5. AI
 
-Heuristic, cheap, deterministic, and runs in `core`.
+Heuristic, cheap, deterministic (same state, same action), and runs in `core.ai`. Each call
+returns one action; the AI is asked again until it ends its turn.
 
-Each AI turn:
+1. **Attack.** Over every own province with movable armies and every non-own neighbour whose win
+   chance with all movable armies is at least the personality's *boldness*, pick the highest
+   `chance × value / (1 + 0.1 × defenders)`. Value is the target's yield, plus 2 for a capital,
+   plus 3 if its owner has two provinces or fewer, plus the personality's *neutral bias* for a
+   neutral. **Commit** the larger of: the fewest armies reaching the personality's *confidence*,
+   and everything except a guard as large as the biggest other enemy stack next to the source.
+2. **Logistics.** Move fresh armies from an interior province one step towards the frontier
+   province with the best prospect — the best `value / (defenders × border defence + 1)` of its
+   targets — divided by `1 + distance`. Supply goes where an attack can succeed, not merely to the
+   nearest front: nearest-front supply deadlocked equal stacks across mountain borders.
+3. **End turn.**
 
-1. **Attack** every adjacent target where the estimated win chance exceeds the kingdom's
-   *boldness* threshold, best odds first, preferring targets that are weakly held, high-yield, or
-   the capital of a weakened rival.
-2. **Logistics**: move fresh surplus from interior provinces one step towards the nearest
-   frontier (BFS distance over own provinces), keeping a garrison that grows with the province's
-   yield.
-3. End turn.
+| Personality | Boldness | Confidence | Neutral bias | Plays seats |
+| --- | --- | --- | --- | --- |
+| Balanced | 0.70 | 0.95 | 1.0 | 1, 4 |
+| Aggressive | 0.55 | 0.85 | 0.0 | 2, 5 |
+| Cautious | 0.85 | 0.99 | 2.0 | 3 |
 
-Personalities are parameter sets (boldness, preference for neutrals vs kingdoms, how much is kept
-on the frontier). The UI plays AI moves back with short animations; the AI itself is instant.
+The UI plays AI turns one action at a time (≈450 ms per move, 200 ms per end of turn), draws the
+latest move as an arrow in the mover's colour, and offers **Skip** to resolve the remaining AI
+turns at once.
 
 ## 6. Screens and interaction
 
 - **Title** — new game (kingdom count, map size preset or custom province count, map seed
   optional), resume.
 - **Game** — the map with pan/zoom, a small HUD: current kingdom, round, armies growing next round,
-  End Turn button. Each province shows its yield (+1/+2) next to its army count.
+  End Turn button. Each province shows its yield (+1 to +3) next to its army count.
 - **Result** — victory/defeat, play again.
 
 Tap targets: a selected source highlights valid targets; tapping elsewhere deselects. Hit-testing
@@ -263,7 +306,7 @@ Cozy, cartoony, cel-shaded — a painted tabletop diorama seen from above at a s
   caps, reeds and pools for marsh, lakes with a light rim, gentle animated waves along coasts.
   Border features (§3.4) are props placed along the border polyline.
 - **Armies.** A small banner/figure in kingdom colour with a count badge, standing on the
-  province's visual centre (pole of inaccessibility, not the Voronoi site).
+  province's site, which the generator guarantees lies inside the outline.
 - **Performance.** Static layers (terrain, borders, props) are rendered once to an `ImageBitmap`
   and redrawn only when ownership changes; armies, selection and water animate on top.
 
@@ -288,8 +331,16 @@ Guidelines, not rules — the game itself has no round or time limit.
 
 ## 11. Open questions
 
-None open.
+1. **Turn order.** Simulation (300 games per line, all AI): with **Fixed** order the first seat
+   wins only 8–14% of 4-kingdom games and the last 37–48%, because growth at the end of the round
+   refills the last seat's weakened provinces before anyone can strike, while the first seat's stay
+   exposed to every other kingdom. The first seat is the human. **Rotating** cuts the bias but
+   seat 0 still won up to 35%. **Shuffled** is fair: every seat 21–29%. Growing on each kingdom's
+   own turn instead flips the bias to the first seats (31–44%), so it is not an alternative.
+   *Proposed:* Shuffled as the default. It means the player no longer always moves first, and a
+   kingdom can occasionally act twice in a row across a round boundary. Until decided, the default
+   stays Fixed and the debug bar switches between all three.
 
 Decided 2026-10-15: home-grown armies (§4.5); fatigue, one move per army per turn (§4.3); no sea
 movement (§3.2); no terrain defence (§3.3); Forest stays; no turn or time limit (§1, §9);
-configurable map size (§3.5).
+configurable map size (§3.5). Coastal is an attribute giving +1 yield, not a terrain (§3.3).

@@ -29,9 +29,13 @@ Multiplatform, targeting Android, iOS and desktop (macOS, Linux).
 ./gradlew :core:jvmTest                         # fast loop: core tests on the JVM
 ./gradlew :core:allTests                        # core tests on JVM, Android host and iOS simulator
 ./gradlew :composeApp:run                       # desktop app
+./gradlew :composeApp:jvmTest                   # headless renders → composeApp/build/snapshots/*.png
+TUNING=1 ./gradlew :core:jvmTest --tests '*TuningReport*' -i | grep REPORT   # Design §9 numbers, ~1 min
 ./gradlew :androidApp:assembleDebug             # APK → androidApp/build/outputs/apk/debug/
 ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64   # iOS framework without Xcode
 open iosApp/iosApp.xcodeproj                    # iOS app; the build phase calls Gradle
+xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
+  -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.2' build   # iOS app from the CLI
 ```
 
 - Versions live in `gradle/libs.versions.toml` only. Compose Multiplatform 1.12 requires
@@ -56,3 +60,5 @@ open iosApp/iosApp.xcodeproj                    # iOS app; the build phase calls
 - **A border polyline is generated once and shared by both provinces.** Generating it per province
   produces gaps and overlaps between neighbours.
 - **The UI's win-chance preview calls the battle code in `core`.** Never a separate estimate.
+- **Re-run the tuning report after changing rules, setup or AI.** Unit tests do not catch a
+  fairness or game-length regression; the report does (Design §9).

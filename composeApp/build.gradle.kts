@@ -28,6 +28,9 @@ kotlin {
             implementation(libs.compose.foundation)
             implementation(libs.compose.ui)
         }
+        jvmTest.dependencies {
+            implementation(libs.kotlin.test)
+        }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
