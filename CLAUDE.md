@@ -25,9 +25,27 @@ Multiplatform, targeting Android, iOS and desktop (macOS, Linux).
 
 ## Commands
 
-_None yet — filled in at M0 (scaffold)._
+```sh
+./gradlew :core:jvmTest                         # fast loop: core tests on the JVM
+./gradlew :core:allTests                        # core tests on JVM, Android host and iOS simulator
+./gradlew :composeApp:run                       # desktop app
+./gradlew :androidApp:assembleDebug             # APK → androidApp/build/outputs/apk/debug/
+./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64   # iOS framework without Xcode
+open iosApp/iosApp.xcodeproj                    # iOS app; the build phase calls Gradle
+```
+
+- Versions live in `gradle/libs.versions.toml` only. Compose Multiplatform 1.12 requires
+  `compileSdk` 37; do not lower it.
+- `iosApp` uses a folder-synced group: new Swift files in `iosApp/iosApp/` are picked up without
+  editing `project.pbxproj`. Keep `Info.plist` outside that folder, or it is copied as a resource
+  and the build fails.
 
 ## Architecture rules
+
+- **Package root is `nl.lamia.kingdoms`** — also the Android application id and iOS bundle id.
+  `core` lives under `nl.lamia.kingdoms.core`, the app under `nl.lamia.kingdoms.app`.
+- **Map size is never a constant.** Everything that depends on it reads `MapConfig` (Design §3.5);
+  tests run across size presets, and the player chooses it.
 
 - **`core` is pure common Kotlin.** No Compose, no platform APIs, no `expect/actual` for game logic.
   If game logic needs it, it is in the wrong module.
