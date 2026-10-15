@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -21,7 +22,9 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextMeasurer
@@ -94,9 +97,15 @@ fun MapView(
 ) {
     val map = game.map
     val paths = remember(map) { MapPaths(map) }
+    // The gesture detectors below restart only when the map changes, so they must read the
+    // callbacks through state: a new game on the same map brings new callbacks.
+    val currentOnTap by rememberUpdatedState(onTap)
+    val currentOnLongPress by rememberUpdatedState(onLongPress)
     val text = rememberTextMeasurer()
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     var camera by remember(map) { mutableStateOf<Camera?>(null) }
+
+    fun provinceAt(screen: Offset) = camera?.let { map.provinceAt(it.toWorld(screen))?.id }
 
     val source = selected?.takeIf { game.isHumanTurn && game.movable(it) > 0 }
     val targets = source?.let { map.provinces[it].neighbours }.orEmpty()
@@ -113,20 +122,27 @@ fun MapView(
                 }
             }
             .pointerInput(map) {
+                // Initial pass, so a right-click is consumed before the tap detector sees it.
                 awaitPointerEventScope {
                     while (true) {
-                        val event = awaitPointerEvent()
-                        if (event.type == PointerEventType.Scroll) {
-                            val change = event.changes.first()
-                            camera = camera?.zoom(if (change.scrollDelta.y > 0) 1 / 1.1f else 1.1f, change.position)
-                            change.consume()
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val change = event.changes.first()
+                        when {
+                            event.type == PointerEventType.Scroll -> {
+                                camera = camera?.zoom(if (change.scrollDelta.y > 0) 1 / 1.1f else 1.1f, change.position)
+                                change.consume()
+                            }
+                            event.type == PointerEventType.Press && event.buttons.isSecondaryPressed -> {
+                                currentOnLongPress(provinceAt(change.position))
+                                change.consume()
+                            }
                         }
                     }
                 }
             }
             .pointerInput(map) {
-                fun at(screen: Offset) = camera?.let { map.provinceAt(it.toWorld(screen))?.id }
-                detectTapGestures(onTap = { onTap(at(it)) }, onLongPress = { onLongPress(at(it)) })
+                val at = ::provinceAt
+                detectTapGestures(onTap = { currentOnTap(at(it)) }, onLongPress = { currentOnLongPress(at(it)) })
             },
     ) {
         drawRect(Palette.DeepSea)

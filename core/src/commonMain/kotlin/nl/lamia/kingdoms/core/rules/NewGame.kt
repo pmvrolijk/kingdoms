@@ -29,7 +29,7 @@ object NewGame {
         kingdoms: Int,
         seed: Long,
         humans: Set<Int> = setOf(0),
-        turnOrder: TurnOrder = TurnOrder.Fixed,
+        turnOrder: TurnOrder = TurnOrder.Shuffled,
     ): GameState {
         require(kingdoms in MIN_KINGDOMS..MAX_KINGDOMS) { "kingdoms must be $MIN_KINGDOMS..$MAX_KINGDOMS, was $kingdoms" }
         require(map.config.fits(kingdoms)) { "${map.provinces.size} provinces are too few for $kingdoms kingdoms" }

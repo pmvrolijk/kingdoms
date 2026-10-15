@@ -26,7 +26,7 @@ object Simulation {
         kingdoms: Int,
         seed: Long,
         ai: Ai,
-        turnOrder: TurnOrder = TurnOrder.Fixed,
+        turnOrder: TurnOrder = TurnOrder.Shuffled,
         maxRounds: Int = 200,
     ): SimulationResult {
         var state = NewGame.create(map, kingdoms, seed, humans = emptySet(), turnOrder = turnOrder)

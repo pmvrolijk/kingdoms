@@ -6,7 +6,8 @@ import kotlin.test.assertIs
 
 internal object Fixtures {
     val map = MapGenerator.generate(MapConfig(seed = 3))
-    val game = NewGame.create(map, kingdoms = 4, seed = 3)
+    /** Fixed order, so turn-sequence tests can name who moves next. */
+    val game = NewGame.create(map, kingdoms = 4, seed = 3, turnOrder = TurnOrder.Fixed)
 }
 
 internal fun GameState.with(vararg changes: Pair<Int, Holding>): GameState {

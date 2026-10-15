@@ -5,14 +5,16 @@ session. Keep it short — it earns its value by being short.
 
 ## 1. Where things stand
 
-- **Phase:** M3 AI done, pending one decision (§2). Next is M4 (look). Branch `master`.
+- **Phase:** M3 AI done. Next is M4 (look). Branch `master`.
 - **Modules:** `core`, `composeApp`, `androidApp`, `iosApp` (Design §2.1). `core.map` generates
   the map (Design §3); `core.rules` is setup, moves, fatigue, battle, growth, elimination
   (Design §4); `core.ai` has `HeuristicAi` with three personalities, `Simulation`, `PassiveAi`. The app plays a game: owner
   bands, army badges with yield, capital rings, movable dots, dashed targets with win chances,
   long-press amount picker, turn bar with per-kingdom totals, event log, victory/defeat panel,
   debug buttons (map seed/size, kingdom count 2–6, turn order, restart). AI turns play step by
-  step with an arrow for the latest move and a Skip button. 54 core tests + 3 snapshot tests.
+  step with an arrow for the latest move and a Skip button. Amount picker by long-press or
+  right-click on the target. 55 core tests; composeApp has 4 snapshot tests, 3 UI play tests and
+  2 picker tests (Compose ui-test, virtual clock, ~30 s).
 - **M1 verified:** 14 property tests over 34 maps (10 seeds × 3 presets, plus 6, 120, no-sea and
   70%-sea/all-features) pass on JVM, Android host and iOS simulator: exact province count,
   connected land, symmetric neighbours, shared border paths identical in both outlines, cells
@@ -45,8 +47,15 @@ session. Keep it short — it earns its value by being short.
 
 ## 2. Open decisions (need the user)
 
-- **Design §11 #1 — turn order.** Proposed: Shuffled (fair), at the cost of the player not
-  always moving first. Default is Fixed until decided; the debug bar has all three.
+- **Unexplained (watch for it):** once, right after starting the app and switching Turns to
+  Shuffled, the user could not move. Not reproducible since, by the user or by tests (App-level
+  play tests click Shuffled/Restart then play 4 turns and check each move lands in the game on
+  screen). Compose 1.12 restarts `pointerInput` when its lambda changes, so stale tap handlers are
+  ruled out. If it recurs: note the turn bar text, whether selection/targets showed, any log line,
+  and the terminal output.
+- **Design §11 #1 — second-mover edge in two-kingdom games** (57–65% for the second mover since
+  the user asked for alternation when two remain). Proposed: extra starting armies for the
+  first mover. Doesn't block M4.
 
 ## 3. To do next
 
@@ -58,12 +67,13 @@ In order; each milestone ends with something runnable on desktop.
       regenerate. Rivers are per-border, not connected
       chains — fine for rules, revisit in M4 for looks.
 - [x] **M2 Rules.** Playable against passive kingdoms on desktop.
-- [x] **M3 AI.** Heuristic AI, simulation, fair setup, paced AI turns. Turn-order default
-      awaits Design §11 #1. Not played by hand against the AI yet.
+- [x] **M3 AI.** Heuristic AI, simulation, fair setup, paced AI turns, Shuffled order.
 - [ ] **M4 Look.** The 2.5D cel-shaded style (Design §8): board edge, props, banners, water,
       cached static layer.
 - [ ] **M5 Platforms and polish.** Touch input on Android/iOS, title/result screens, autosave
-      and resume.
+      and resume (the `onChange` hook is there). HUD layout: at 1024×768 the bottom-left panels
+      cover the player's own provinces — the kingdom list and log need to move or collapse, and
+      the camera fit should leave room for the HUD.
 
 ## 4. Handover
 
@@ -83,8 +93,19 @@ Latest first. Keep the last three sessions; condense older ones to a line under 
   start to ≈ fair at 4 kingdoms (×2 and ×4 measured, ×3 kept); (7) a 2-kingdom stalemate (two
   300-stacks across a ×1.5 mountain border) was fixed by prospect-based logistics and guarded
   commits, not by rule changes.
-- **Picking this up:** get the user's call on Design §11 #1 (one default in `App.kt` and
-  `NewGame.create`), play a game against the AI by hand, then M4.
+- Bug hunt after the user could not move once (see §1 "Unexplained"): added `PlayTest` — plays
+  rounds through `GameScreen`/`App` with real clicks on a virtual clock — and a human-seat vs
+  `HeuristicAi` stress test in `FullGameTest`; `GameScreen`/`App` gained `onChange` hooks. Two
+  hypotheses (stale tap handlers; AI exception mid-turn) tested and ruled out.
+- User chose Shuffled turn order. The long-press picker "didn't work on desktop": a test showed
+  mouse long-press does open it — it must be on the target after selecting a source, and the
+  picker appears in a corner. Added right-click, a pending-move arrow and a how-to hint.
+- User asked for alternation once two kingdoms remain (no double turns head to head). Done,
+  with a test. Side effect measured and written up as Design §11 #1; own-turn growth as a fix
+  was measured and rejected (78–83% for the first mover).
+- **Picking this up:** answer Design §11 #1, then M4 — the 2.5D cel-shaded look (Design §8).
+  Use the snapshot tests to see the result; consider the HUD-covers-map issue (M5 note)
+  while restyling panels.
 
 ### 2026-10-15 — Session 1d: M2 rules
 

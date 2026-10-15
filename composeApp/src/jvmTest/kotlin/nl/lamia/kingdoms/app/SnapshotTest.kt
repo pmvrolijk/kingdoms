@@ -2,6 +2,9 @@ package nl.lamia.kingdoms.app
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.ImageComposeScene
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -10,10 +13,12 @@ import androidx.compose.ui.use
 import nl.lamia.kingdoms.core.map.MapConfig
 import nl.lamia.kingdoms.core.map.MapGenerator
 import nl.lamia.kingdoms.core.map.MapSize
+import nl.lamia.kingdoms.core.rules.GameState
 import nl.lamia.kingdoms.core.rules.NewGame
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -51,6 +56,32 @@ class SnapshotTest {
             scene.tap(camera.toScreen(map.provinces[target].site), frame = 3)
             scene.save("attacked.png", frame = 4)
         }
+    }
+
+    /** Regression: a new game on the same map (Restart, turn order, kingdoms) must still take taps. */
+    @Test
+    fun tapsReachANewGameOnTheSameMap() {
+        val map = MapGenerator.generate(MapConfig.of(MapSize.Medium, seed = 1))
+        val first = NewGame.create(map, kingdoms = 4, seed = 1)
+        val second = NewGame.create(map, kingdoms = 4, seed = 2)
+        val (source, target) = second.provincesOf(0).filter { second.movable(it) > 0 }.firstNotNullOf { p ->
+            map.provinces[p].neighbours.firstOrNull { second.owner(it) == null }?.let { p to it }
+        }
+        val camera = Camera.fit(map, IntSize(width, height))
+        var start by mutableStateOf(first)
+        var latest: GameState? = null
+        ImageComposeScene(width, height) {
+            GameScreen(start, onNewGame = {}, Modifier.fillMaxSize(), onChange = { latest = it })
+        }.use { scene ->
+            scene.render()
+            start = second
+            scene.render(nanoTime = 500_000_000L)
+            scene.tap(camera.toScreen(map.provinces[source].site), frame = 1)
+            scene.tap(camera.toScreen(map.provinces[target].site), frame = 2)
+            scene.save("new-game-same-map.png", frame = 3)
+        }
+        assertEquals(second.seed, latest?.seed, "the tap went to the previous game")
+        assertEquals(0, latest?.movable(source), "the tap-move from #$source did not reach the new game")
     }
 
     @Test

@@ -20,24 +20,30 @@ import androidx.compose.ui.unit.dp
 import nl.lamia.kingdoms.core.map.MapConfig
 import nl.lamia.kingdoms.core.map.MapGenerator
 import nl.lamia.kingdoms.core.map.MapSize
+import nl.lamia.kingdoms.core.rules.GameState
 import nl.lamia.kingdoms.core.rules.NewGame
 import nl.lamia.kingdoms.core.rules.TurnOrder
 import kotlin.random.Random
 import kotlin.time.measureTimedValue
 
 @Composable
-fun App() {
+fun App(onGameChange: (GameState) -> Unit = {}) {
     var config by remember { mutableStateOf(MapConfig.of(MapSize.Medium, seed = 1)) }
     var kingdoms by remember { mutableStateOf(4) }
     var restarts by remember { mutableStateOf(0) }
-    var turnOrder by remember { mutableStateOf(TurnOrder.Fixed) }
+    var turnOrder by remember { mutableStateOf(TurnOrder.Shuffled) }
     val (map, took) = remember(config) { measureTimedValue { MapGenerator.generate(config) } }
     val game = remember(map, kingdoms, restarts, turnOrder) {
         NewGame.create(map, kingdoms, seed = config.seed + restarts, turnOrder = turnOrder)
     }
 
     Box(Modifier.fillMaxSize().background(Palette.DeepSea)) {
-        GameScreen(game, onNewGame = { config = config.copy(seed = Random.nextLong(1, 1_000_000)) }, Modifier.fillMaxSize())
+        GameScreen(
+            game,
+            onNewGame = { config = config.copy(seed = Random.nextLong(1, 1_000_000)) },
+            Modifier.fillMaxSize(),
+            onChange = onGameChange,
+        )
         Column(
             Modifier.align(Alignment.TopStart).safeDrawingPadding().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),

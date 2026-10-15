@@ -112,6 +112,18 @@ class RulesTest {
         assertEquals(s.draws + 1, after.draws)
     }
 
+    @Test
+    fun withTwoKingdomsLeftAShuffledOrderAlternates() {
+        var s = game.only(p to Holding(0, 2), q to Holding(2, 2)).copy(turnOrder = TurnOrder.Shuffled)
+        val movers = mutableListOf(s.current)
+        repeat(40) {
+            s = s.play(Action.EndTurn).state
+            movers += s.current
+        }
+        assertTrue(movers.zipWithNext().all { (a, b) -> a != b }, "a kingdom moved twice in a row: $movers")
+        assertTrue(s.round > 15)
+    }
+
     private fun rotatingFour(): GameState {
         val four = map.provinces.indices.filter { it != p && it != q }.take(2)
         return game.only(p to Holding(0, 2), q to Holding(1, 2), four[0] to Holding(2, 2), four[1] to Holding(3, 2))

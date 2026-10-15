@@ -179,13 +179,14 @@ count matches.
 ### 4.2 Round and turn
 
 A **round** is every living kingdom taking one turn. In round 1 the order is by kingdom id, so
-the player moves first. From round 2 the order follows the game's `TurnOrder` (see §11):
+the player moves first. From round 2 the order follows the game's `TurnOrder`, **Shuffled** by
+default:
 
 | TurnOrder | Order each round |
 | --- | --- |
 | Fixed | By kingdom id, every round |
 | Rotating | The starting kingdom moves one seat each round |
-| Shuffled | A fresh random order each round, from the game seed |
+| Shuffled | A fresh random order each round, from the game seed. With two kingdoms left they alternate: the one that did not just move goes first, so neither gets a double turn |
 
 At the end of the round, provinces grow (§4.5).
 
@@ -196,7 +197,8 @@ During its turn a kingdom performs any number of **moves**, then ends the turn.
 The player taps a source province they own, then an adjacent target.
 
 - **Amount.** By default all *surplus* armies move — everything except 1, which always stays
-  behind. Long-press on the target (touch or mouse) opens an amount picker instead.
+  behind. Long-press (touch or mouse) or right-click on the target opens an amount picker
+  instead; an arrow shows the pending move, and the selected province's panel says how.
 - **Fatigue.** Each army moves at most once per turn. A province tracks how many of its armies
   are fresh; armies that arrive (by transfer or conquest) are fatigued until the kingdom's next
   turn. This prevents one stack crossing the whole map in a turn.
@@ -331,15 +333,19 @@ Guidelines, not rules — the game itself has no round or time limit.
 
 ## 11. Open questions
 
-1. **Turn order.** Simulation (300 games per line, all AI): with **Fixed** order the first seat
-   wins only 8–14% of 4-kingdom games and the last 37–48%, because growth at the end of the round
-   refills the last seat's weakened provinces before anyone can strike, while the first seat's stay
-   exposed to every other kingdom. The first seat is the human. **Rotating** cuts the bias but
-   seat 0 still won up to 35%. **Shuffled** is fair: every seat 21–29%. Growing on each kingdom's
-   own turn instead flips the bias to the first seats (31–44%), so it is not an alternative.
-   *Proposed:* Shuffled as the default. It means the player no longer always moves first, and a
-   kingdom can occasionally act twice in a row across a round boundary. Until decided, the default
-   stays Fixed and the debug bar switches between all three.
+1. **Second-mover edge in two-kingdom games.** Alternation makes a game that *starts* with two
+   kingdoms a fixed order, and the kingdom moving second always acts just before growth: it wins
+   57–65% (Small 65%, Medium/Large 57%; 200 games each). Seat 0 — the human — moves first.
+   Endgames of 4- and 6-kingdom games are unaffected (seats 22–28%). Growing on each kingdom's
+   own turn while two are left was measured and is much worse (first mover 78–83%).
+   *Options:* accept it; give the first mover in a two-kingdom game extra starting armies
+   (tunable, like compensation); or keep shuffling while both kingdoms are still at their
+   starting size. *Proposed:* extra starting armies for the first mover, tuned by simulation.
+
+Decided 2026-10-15, turn order: **Shuffled** by default. Simulation (300 games per line, all AI)
+showed Fixed order letting the first seat — the human — win only 8–14% of 4-kingdom games and the
+last seat 37–48%; Rotating still up to 35% for seat 0; Shuffled 21–29% for every seat. Fixed and
+Rotating stay available.
 
 Decided 2026-10-15: home-grown armies (§4.5); fatigue, one move per army per turn (§4.3); no sea
 movement (§3.2); no terrain defence (§3.3); Forest stays; no turn or time limit (§1, §9);

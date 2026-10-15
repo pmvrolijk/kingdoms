@@ -11,6 +11,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** Whole games through the public rules, checking invariants after every action (Status M2). */
+private const val SEEDS = 5L
+
 class FullGameTest {
     /** Attacks only near-certain wins; otherwise moves interior armies one step towards the front. */
     private val greedy = Ai { s ->
@@ -57,6 +59,28 @@ class FullGameTest {
                 checkInvariants(s)
             }
             assertEquals(0, s.winner, "$size seed $seed after ${s.round} rounds")
+        }
+    }
+
+    @Test
+    fun aHumanSeatAgainstTheHeuristicAiNeverBreaksTheGame() {
+        val ai = nl.lamia.kingdoms.core.ai.HeuristicAi()
+        for (order in TurnOrder.entries) for (size in MapSize.entries) for (kingdoms in listOf(2, 4, 6)) for (seed in 1L..SEEDS) {
+            val config = MapConfig.of(size, seed)
+            if (!config.fits(kingdoms)) continue
+            var s = NewGame.create(MapGenerator.generate(config), kingdoms, seed, turnOrder = order)
+            while (!s.isOver && s.round <= 200) {
+                s = if (s.isHumanTurn) {
+                    val outcome = Rules.apply(s, greedy.decide(s))
+                    check(outcome is Outcome.Applied) { "greedy move rejected: $outcome" }
+                    outcome.state
+                } else {
+                    playUntilHumanTurn(s, ai).state
+                }
+                checkInvariants(s)
+                assertTrue(s.isOver || s.isHumanTurn || s.current != 0, "$order $size k=$kingdoms seed $seed")
+            }
+            assertTrue(s.isOver, "$order $size k=$kingdoms seed $seed: no result after 200 rounds")
         }
     }
 

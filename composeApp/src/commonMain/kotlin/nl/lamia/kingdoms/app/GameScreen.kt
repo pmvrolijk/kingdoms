@@ -46,7 +46,13 @@ private const val AI_END_TURN_MILLIS = 200L
 
 /** One game: the map, the turn HUD, the move picker and the end-of-game panel. */
 @Composable
-fun GameScreen(start: GameState, onNewGame: () -> Unit, modifier: Modifier = Modifier) {
+fun GameScreen(
+    start: GameState,
+    onNewGame: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** Every new state, after each applied action. */
+    onChange: (GameState) -> Unit = {},
+) {
     var game by remember(start) { mutableStateOf(start) }
     var selected by remember(start) { mutableStateOf<Int?>(null) }
     var picker by remember(start) { mutableStateOf<Picker?>(null) }
@@ -56,6 +62,7 @@ fun GameScreen(start: GameState, onNewGame: () -> Unit, modifier: Modifier = Mod
 
     fun record(next: GameState, events: List<Event>) {
         game = next
+        onChange(next)
         log = (log + events.mapNotNull { describe(next, it) }).takeLast(5)
     }
 
@@ -84,7 +91,7 @@ fun GameScreen(start: GameState, onNewGame: () -> Unit, modifier: Modifier = Mod
         MapView(
             game,
             selected,
-            lastMove,
+            picker?.let { Arrow(it.from, it.to, game.current) } ?: lastMove,
             onTap = { p ->
                 val from = selected
                 picker = null
@@ -206,8 +213,13 @@ private fun describeProvince(game: GameState, id: Int): String {
     val coast = if (p.coastal) ", coastal" else ""
     val borders = p.neighbours.mapNotNull { n -> game.map.border(id, n)?.feature?.let { "#$n ${it.name} ×${it.defence}" } }
     val featureLine = if (borders.isEmpty()) "" else "\nborders: ${borders.joinToString(", ")}"
+    val hint = if (game.isHumanTurn && game.movable(id) > 0) {
+        "\nClick a neighbour to send ${game.movable(id)} · long-press or right-click it to choose how many"
+    } else {
+        ""
+    }
     return "#$id ${p.terrain.name}$coast · ${p.resources.joinToString(" + ")} · +${p.yield}/round\n" +
-        "$owner · ${h.armies} armies$movable$featureLine"
+        "$owner · ${h.armies} armies$movable$featureLine$hint"
 }
 
 private fun Event.arrow(): Arrow? = when (this) {

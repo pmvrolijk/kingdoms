@@ -31,7 +31,7 @@ data class GameState(
     val round: Int,
     /** The kingdom whose turn it is. */
     val current: Int,
-    val turnOrder: TurnOrder = TurnOrder.Fixed,
+    val turnOrder: TurnOrder = TurnOrder.Shuffled,
     /** This round's turn order (kingdom ids); fallen kingdoms are skipped. */
     val order: List<Int> = kingdoms.map { it.id },
     /** The last kingdom standing, once there is one. */

@@ -75,7 +75,13 @@ object Rules {
             order = when (state.turnOrder) {
                 TurnOrder.Fixed -> state.order
                 TurnOrder.Rotating -> state.kingdoms.indices.map { (it + round - 1) % state.kingdoms.size }
-                TurnOrder.Shuffled -> state.kingdoms.indices.shuffled(Random(mix(state.seed, ORDERS, draws++)))
+                // Head to head, a random order would hand the last mover a double turn half the
+                // time; alternate instead: the kingdom that did not just move goes first.
+                TurnOrder.Shuffled -> if (alive.size == 2) {
+                    alive.filter { it != state.current } + state.current + state.kingdoms.indices.filter { it !in alive }
+                } else {
+                    state.kingdoms.indices.shuffled(Random(mix(state.seed, ORDERS, draws++)))
+                }
             }
             next = order.first { it in alive }
         }
