@@ -1,6 +1,8 @@
 package nl.lamia.kingdoms.core.ai
 
 import nl.lamia.kingdoms.core.rules.Action
+import nl.lamia.kingdoms.core.rules.Battle
+import nl.lamia.kingdoms.core.rules.Difficulty
 import nl.lamia.kingdoms.core.rules.GameState
 
 /** How an AI kingdom plays (Design §5). */
@@ -29,12 +31,41 @@ data class Personality(
  * Attack the best target it can win; otherwise move interior armies one step towards the front;
  * otherwise end the turn. Deterministic: the same state gives the same action.
  */
+private const val EASY_BOLDNESS = 0.9
+private const val EASY_CONFIDENCE = 0.8
+private const val LEADER_BONUS = 2.0
+
 class HeuristicAi(private val personality: (kingdom: Int) -> Personality = Personality::forSeat) : Ai {
     override fun decide(state: GameState): Action = attack(state) ?: logistics(state) ?: Action.EndTurn
+
+    /**
+     * What a difficulty changes (Design §5). Easy is timid and disorganised: it attacks only near
+     * certainties, commits too little, and supplies the nearest front every other round. Hard
+     * also reinforces fronts under threat first and goes after the strongest rival.
+     */
+    private class Skill(
+        val boldness: Double,
+        val confidence: Double,
+        val supplyByProspect: Boolean,
+        val supplyEveryRound: Boolean,
+        val defendFirst: Boolean,
+        val focusLeader: Boolean,
+    )
+
+    private fun skill(state: GameState): Skill {
+        val p = personality(state.current)
+        return when (state.kingdoms[state.current].difficulty) {
+            Difficulty.Easy -> Skill(maxOf(p.boldness, EASY_BOLDNESS), EASY_CONFIDENCE, false, false, false, false)
+            Difficulty.Normal -> Skill(p.boldness, p.confidence, true, true, false, false)
+            Difficulty.Hard -> Skill(p.boldness, p.confidence, true, true, defendFirst = true, focusLeader = true)
+        }
+    }
 
     private fun attack(state: GameState): Action? {
         val me = state.current
         val p = personality(me)
+        val skill = skill(state)
+        val leader = if (skill.focusLeader) leader(state) else null
         var best: Action.Move? = null
         var bestScore = 0.0
         for (from in state.provincesOf(me)) {
@@ -43,16 +74,21 @@ class HeuristicAi(private val personality: (kingdom: Int) -> Personality = Perso
             for (to in state.map.provinces[from].neighbours) {
                 if (state.owner(to) == me) continue
                 val chance = state.winChance(from, to, movable)
-                if (chance < p.boldness) continue
-                val score = chance * value(state, to, p) / (1 + 0.1 * state.holdings[to].armies)
+                if (chance < skill.boldness) continue
+                val focus = if (leader != null && state.owner(to) == leader) LEADER_BONUS else 0.0
+                val score = chance * (value(state, to, p) + focus) / (1 + 0.1 * state.holdings[to].armies)
                 if (score > bestScore) {
                     bestScore = score
-                    best = Action.Move(from, to, commit(state, from, to, movable, p.confidence))
+                    best = Action.Move(from, to, commit(state, from, to, movable, skill.confidence))
                 }
             }
         }
         return best
     }
+
+    /** The rival with the most armies, other than the current kingdom. */
+    private fun leader(state: GameState): Int? = state.alive.filter { it != state.current }
+        .maxByOrNull { k -> state.provincesOf(k).sumOf { state.holdings[it].armies } }
 
     /** What taking [province] is worth: its yield, more for a capital or a rival about to fall. */
     private fun value(state: GameState, province: Int, p: Personality): Double {
@@ -87,13 +123,22 @@ class HeuristicAi(private val personality: (kingdom: Int) -> Personality = Perso
     private fun logistics(state: GameState): Action? {
         val me = state.current
         val p = personality(me)
+        val skill = skill(state)
+        if (!skill.supplyEveryRound && state.round % 2 == 1) return null
         val provinces = state.map.provinces
         val mine = state.provincesOf(me)
         val frontier = mine.filter { f -> provinces[f].neighbours.any { state.owner(it) != me } }
         if (frontier.isEmpty()) return null
         val prospect = frontier.associateWith { f ->
-            provinces[f].neighbours.filter { state.owner(it) != me }.maxOf { e ->
+            val attack = provinces[f].neighbours.filter { state.owner(it) != me }.maxOf { e ->
                 value(state, e, p) / (state.holdings[e].armies * state.defence(f, e) + 1)
+            }
+            // Hard: a front an enemy stack could take next turn comes first.
+            val threat = if (skill.defendFirst) threat(state, f) else 0.0
+            when {
+                threat > 0.5 -> 100.0 + threat
+                skill.supplyByProspect -> attack
+                else -> 1.0 // every front alike: supply simply goes to the nearest
             }
         }
         val distances = frontier.associateWith { f -> distancesWithin(state, f, me) }
@@ -106,6 +151,15 @@ class HeuristicAi(private val personality: (kingdom: Int) -> Personality = Perso
             return Action.Move(from, next)
         }
         return null
+    }
+
+    /** The best chance any adjacent enemy kingdom stack has of taking [province] next turn. */
+    private fun threat(state: GameState, province: Int): Double {
+        val me = state.current
+        return state.map.provinces[province].neighbours
+            .filter { state.owner(it).let { o -> o != null && o != me } }
+            .maxOfOrNull { e -> Battle.winChance(state.holdings[e].armies - 1, state.holdings[province].armies, state.defence(e, province)) }
+            ?: 0.0
     }
 
     /** Graph distance from [start] to each province of [kingdom], moving only through its own land. */

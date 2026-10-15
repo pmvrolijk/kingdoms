@@ -4,6 +4,7 @@ import nl.lamia.kingdoms.core.map.MapConfig
 import nl.lamia.kingdoms.core.map.MapGenerator
 import nl.lamia.kingdoms.core.map.MapSize
 import nl.lamia.kingdoms.core.rules.Action
+import nl.lamia.kingdoms.core.rules.Difficulty
 import nl.lamia.kingdoms.core.rules.Fixtures
 import nl.lamia.kingdoms.core.rules.Holding
 import nl.lamia.kingdoms.core.rules.TurnOrder
@@ -59,6 +60,19 @@ class HeuristicAiTest {
         val s = mine(home to Holding(0, 10, fresh = 10), target to Holding(1, 9))
         assertTrue(s.winChance(home, target) < Personality.Balanced.boldness)
         assertEquals(Action.EndTurn, ai.decide(s))
+    }
+
+    @Test
+    fun anEasyAiHoldsBackWhereANormalOneAttacks() {
+        // Between 70% and 90%: Normal (boldness 0.70) attacks, Easy (needs 0.90) waits.
+        val defence = map.border(home, target)?.defence ?: 1.0
+        val attackers = (1..300).first { nl.lamia.kingdoms.core.rules.Battle.winChance(it, 30, defence) in 0.75..0.88 }
+        val s = mine(home to Holding(0, attackers + 1, fresh = attackers + 1), target to Holding(1, 30))
+        val chance = s.winChance(home, target)
+        assertTrue(chance in 0.7..0.9, "chance $chance")
+        assertIs<Action.Move>(ai.decide(s))
+        val easy = s.copy(kingdoms = s.kingdoms.map { if (it.id == 0) it.copy(difficulty = Difficulty.Easy) else it })
+        assertEquals(Action.EndTurn, ai.decide(easy))
     }
 
     @Test

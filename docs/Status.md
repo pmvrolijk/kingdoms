@@ -5,7 +5,8 @@ session. Keep it short — it earns its value by being short.
 
 ## 1. Where things stand
 
-- **Phase:** M4 look done (first pass). Next is M5 (UI). Branch `master`.
+- **Phase:** M5 UI done (pending the user's look). Next is M6 (platforms and polish). Branch
+  `master`.
 - **Modules:** `core`, `composeApp`, `androidApp`, `iosApp` (Design §2.1). `core.map` generates
   the map (Design §3); `core.rules` is setup, moves, fatigue, battle, growth, elimination
   (Design §4); `core.ai` has `HeuristicAi` with three personalities, `Simulation`, `PassiveAi`. The app plays a game: owner
@@ -68,11 +69,10 @@ In order; each milestone ends with something runnable on desktop.
 - [x] **M3 AI.** Heuristic AI, simulation, fair setup, paced AI turns, Shuffled order.
 - [x] **M4 Look.** Board space with tilt, earth slab, cel props, animated water, banners and
       towers, layered canvases. First pass — expect tweaks from play.
-- [ ] **M5 UI.** The HUD and screens: compact HUD that keeps clear of the map (kingdom list and
-      log collapsible), camera fit that leaves room for it, phone portrait and landscape layouts
-      (on a phone the map is tiny and screen-sized banners crowd it — scale them with zoom
-      below some size), the debug bar replaced by a new-game screen (map size, kingdoms, seed,
-      turn order), title and result screens.
+- [x] **M5 UI.** Landscape lock, HUD (strength bars, turn panel, chronicle, province card
+      with icons and army split bar, slider picker anchored at the target), province names,
+      resource icons on the map, clash animation, banner scaling, new-game screen with seats,
+      colours and AI difficulty, menu, result panel (Design §6).
 - [ ] **M6 Platforms and polish.** Touch tuning on Android/iOS devices, autosave and resume
       (the `onChange` hook is there), real-device performance (the headless emulator renders in
       software, so its frame times say nothing), app icons, the iOS ICU deployment warning.
@@ -81,52 +81,58 @@ In order; each milestone ends with something runnable on desktop.
 
 Latest first. Keep the last three sessions; condense older ones to a line under "Earlier".
 
-### 2026-10-15 — Session 1f: M4 look
+### 2026-10-15 — Session 1h: new-game screen, difficulty, a generator bug
 
-- `Board` (board space, tilt, wall), `BoardGeometry` (paths, walls, rivers, decals and props
-  placed once per map), `Props.kt` (cel-shaded tree, hill, mountain, reeds, tuft, pool, field),
-  `MapView` rebuilt as three layered canvases; `Palette` reworked with `darker`/`lighter`.
-- Iterated on snapshots: second pass thickened outlines, added a selection glow, made fields
-  rounded farmland, thinned mountain provinces, gave capitals a tower with a coloured roof.
-- Found by counting draw calls, not by looking: sibling canvases share a layer, so the animated
-  water re-ran the land's draw every frame. Fixed with a `graphicsLayer` per canvas (150 → 1 land
-  draws per 150 frames). The headless emulator's frame times (~1 s, software GPU) are not a
-  measure of anything; real-device numbers belong to M6.
-- Runs on desktop, Android emulator and iOS simulator. On a phone in portrait the map is tiny
-  and banners crowd it — the user's next ask is the UI, now M5.
-- **Picking this up:** M5 UI. Ask the user what the HUD and screens should feel like before
-  building (layout on phone vs desktop, what must always be visible).
+- New-game screen (`NewGameScreen.kt`, `Setup`) with seats: name, colour (8), You / AI
+  Easy-Normal-Hard; live map preview; random seed on launch. Menu (Resume, Restart, New game…)
+  and result panel (Play again, New game…). `NewGame.Seat`, `Kingdom.colour/difficulty`,
+  `Difficulty` in core; the app colours kingdoms through `GameState.colourOf`.
+- Difficulty in `HeuristicAi` measured: Easy 14%, Normal 23%, Hard 34% (one vs three Normal,
+  400 games); Normal unchanged. Now in the tuning report.
+- "Red usually wins": not the personality (rotations even) and, over 1000 games, not the seat
+  either (32/32/31%). The real effect is geography — the AI farthest from a player who fights
+  their neighbours wins ~48%. The user's games all started on seed 1 (fixed launch seed), where
+  red sits far away; the launch seed is now random. A leader-focused Normal AI would damp the
+  far-kingdom effect generally — not done; Hard has it.
+- Round 1 now puts people first, then the AIs in random order (harmless; it did not explain red).
+- Found while measuring: map generation crashed on 2 of 3000 Medium seeds (greedy vertex snap);
+  union-find made it transitive but mis-tiled ~2% of maps; a rounding-level snap fixed both
+  (0 failures in 9000 maps, no crossings in 1500). `ManySeedsTest` (core jvmTest, ~10 s) guards it.
+- User: "the menu is behind the map" on the new-game screen — dragging the preview drew the board
+  over the settings. `MapView` now clips to its bounds; `previewMapStaysBehindTheSettings` guards it.
+- User: banners, resources and castles stayed the same size when zooming — "scale with the map,
+  maybe at 50%"; and names when zoomed in. `markerScale`: the fitted view as before, then half the
+  map's zoom (clamped 0.4–2.5); names fade in from 120 to 160 dp province width, with a parchment
+  halo. Snapshots `zoom-*.png`.
+- User: "the last arrow of the enemy moves stays visible when it is the players turn". It was
+  cleared only when the player moved; now an AI's end of turn clears it.
+  `noEnemyArrowOnThePlayersTurn` compares the screen with a fresh render of the same state.
+- **Picking this up:** the user looks at the new-game screen; then M6.
 
-### 2026-10-15 — Session 1e: M3 AI
+### 2026-10-15 — Session 1g: M5 HUD
 
-- Tap the selected province again to deselect (user request after playing M2 to a win in 19
-  rounds).
-- `HeuristicAi` + `Personality` (Design §5), `Simulation` (AI-vs-AI with stall flag, rejection
-  count), opt-in `TuningReport` in `core/src/jvmTest`. `GameState` gained `turnOrder` and
-  `order`; `NewGame` gained balanced layouts, random seats and compensation.
-- How the tuning went, so it is not repeated: (1) first run showed the last seat winning 4× the
-  first; (2) shuffling seats over territories didn't help, so it was turn order, not geography;
-  (3) growth on each kingdom's own turn flipped the bias instead; (4) Shuffled order fixed it;
-  (5) balanced layouts cut starting spread 3.1 → ~1.3; (6) compensation ×3 brought the richest
-  start to ≈ fair at 4 kingdoms (×2 and ×4 measured, ×3 kept); (7) a 2-kingdom stalemate (two
-  300-stacks across a ×1.5 mountain border) was fixed by prospect-based logistics and guarded
-  commits, not by rule changes.
-- Bug hunt after the user could not move once (see §1 "Unexplained"): added `PlayTest` — plays
-  rounds through `GameScreen`/`App` with real clicks on a virtual clock — and a human-seat vs
-  `HeuristicAi` stress test in `FullGameTest`; `GameScreen`/`App` gained `onChange` hooks. Two
-  hypotheses (stale tap handlers; AI exception mid-turn) tested and ruled out.
-- User chose Shuffled turn order. The long-press picker "didn't work on desktop": a test showed
-  mouse long-press does open it — it must be on the target after selecting a source, and the
-  picker appears in a corner. Added right-click, a pending-move arrow and a how-to hint.
-- User asked for alternation once two kingdoms remain (no double turns head to head). Done,
-  with a test. Side effect measured and written up as Design §11 #1; own-turn growth as a fix
-  was measured and rejected (78–83% for the first mover).
-- User chose the first-mover bonus; swept 0–12, then 1 and 2 over 400 games: 2 kept
-  (Design §4.1 has the numbers; Small maps stay slightly short).
-- **Picking this up:** M4.
+- User's direction: phones landscape; strength bars for production, territory, armies; a slider
+  on right-click/long-press; the province card as an infographic with resource and army icons;
+  the can-move / stays / fatigued split as a stacked bar. All built (Design §6.1).
+- New: `Icons.kt` (terrain icons reuse the map props), `Hud.kt` (`StackedBar`, `StrengthPanel`,
+  `TurnPanel`, `LogPanel`, `ActionButton`, `anchoredNear`), `ProvinceCard.kt` (`ArmySplit`),
+  `MovePicker.kt` (`AmountSlider` with progress semantics, so tests set it). Camera moved into a
+  `CameraState` that gestures read and write directly — reading it through
+  `rememberUpdatedState` lost taps in the first frame and would drop pan deltas when several
+  pointer events arrive in one frame.
+- Phone landscape snapshot (2556 × 1179 at 3×) looks right; not yet seen on a device.
+- Tweaks after the user's look: resource icons under the army plates instead of "+n";
+  generated province names (`core.map.ProvinceNames`, Design §3.1 step 6) used on the card, in
+  the picker and in a narrative chronicle; a bloodless clash animation (`Clash.kt`, Design §8)
+  in its own canvas, checked frame by frame in snapshots (`clash-early/clash/clash-late.png`).
+- **Picking this up:** new-game screen (done in 1h).
 
 ### Earlier
 
+- **Session 1f (M4):** board space, cel props, layered canvases (a `graphicsLayer` each: land
+  draws 150 → 1 per 150 frames).
+- **Session 1e (M3):** `HeuristicAi`, `Simulation`, `TuningReport`; fairness work — Shuffled
+  order, balanced layouts, compensation ×3, head-to-head bonus 2; a stall fixed via logistics.
 - **Session 1d (M2):** `core.rules` (GameState, Rules.apply, Battle with exact win chance,
   NewGame); app rebuilt around `GameScreen`; headless tap-through snapshot tests.
 - **Session 1b (M0):** hand-built KMP scaffold (no wizard); Compose 1.12 needs compileSdk 37;

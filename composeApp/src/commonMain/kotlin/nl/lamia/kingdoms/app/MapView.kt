@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -46,7 +47,10 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import nl.lamia.kingdoms.core.map.COASTAL_YIELD
 import nl.lamia.kingdoms.core.map.GameMap
+import nl.lamia.kingdoms.core.map.MapGenerator
+import nl.lamia.kingdoms.core.map.Resource
 import nl.lamia.kingdoms.core.map.Point
 import nl.lamia.kingdoms.core.rules.GameState
 import kotlin.math.PI
@@ -54,10 +58,19 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.math.roundToInt
 
 /** A move to show: from province, to province, by kingdom. */
 data class Arrow(val from: Int, val to: Int, val kingdom: Int)
+
+/**
+ * The camera, held where both the map and the HUD can read it. Gestures read and write [camera]
+ * directly, so several pointer events in one frame each see the previous one's result.
+ */
+class CameraState {
+    var camera by mutableStateOf<Camera?>(null)
+}
 
 /** Screen = board × scale + offset; board space is the tilted ground plane (see [Board]). */
 data class Camera(val offset: Offset, val scale: Float) {
@@ -103,9 +116,15 @@ fun MapView(
     game: GameState,
     selected: Int?,
     arrow: Arrow?,
+    cameraState: CameraState,
+    clashes: List<Clash>,
+    /** Frame time for [clashes]. */
+    now: Long,
     onTap: (Int?) -> Unit,
     onLongPress: (Int?) -> Unit,
     modifier: Modifier = Modifier,
+    /** False for a preview: no "can move" dots. */
+    interactive: Boolean = true,
 ) {
     val map = game.map
     val board = remember(map) { BoardGeometry(map) }
@@ -114,25 +133,23 @@ fun MapView(
     val currentOnTap by rememberUpdatedState(onTap)
     val currentOnLongPress by rememberUpdatedState(onLongPress)
     val text = rememberTextMeasurer()
-    var viewSize by remember { mutableStateOf(IntSize.Zero) }
-    var camera by remember(map) { mutableStateOf<Camera?>(null) }
     val waves by rememberInfiniteTransition().animateFloat(0f, 1f, infiniteRepeatable(tween(6_000, easing = LinearEasing)))
 
-    fun provinceAt(screen: Offset) = camera?.let { map.provinceAt(it.toWorld(screen))?.id }
+    fun provinceAt(screen: Offset) = cameraState.camera?.let { map.provinceAt(it.toWorld(screen))?.id }
 
     val source = selected?.takeIf { game.isHumanTurn && game.movable(it) > 0 }
     val targets = source?.let { map.provinces[it].neighbours }.orEmpty()
 
     Box(
         modifier
+            // The layers draw wherever the camera puts the board; keep that inside the view
+            // (the new-game preview sits beside the settings panel).
+            .clipToBounds()
             .background(Palette.Sea)
-            .onSizeChanged {
-                if (camera == null || viewSize == IntSize.Zero) camera = Camera.fit(map, it)
-                viewSize = it
-            }
+            .onSizeChanged { if (cameraState.camera == null && it != IntSize.Zero) cameraState.camera = Camera.fit(map, it) }
             .pointerInput(map) {
                 detectTransformGestures { centroid, pan, zoom, _ ->
-                    camera = camera?.let { Camera(it.offset + pan, it.scale).zoom(zoom, centroid) }
+                    cameraState.camera = cameraState.camera?.let { Camera(it.offset + pan, it.scale).zoom(zoom, centroid) }
                 }
             }
             .pointerInput(map) {
@@ -143,7 +160,7 @@ fun MapView(
                         val change = event.changes.first()
                         when {
                             event.type == PointerEventType.Scroll -> {
-                                camera = camera?.zoom(if (change.scrollDelta.y > 0) 1 / 1.1f else 1.1f, change.position)
+                                cameraState.camera = cameraState.camera?.zoom(if (change.scrollDelta.y > 0) 1 / 1.1f else 1.1f, change.position)
                                 change.consume()
                             }
                             event.type == PointerEventType.Press && event.buttons.isSecondaryPressed -> {
@@ -163,17 +180,17 @@ fun MapView(
         // re-records the shared parent layer and re-runs the land's draw with every prop.
         // Water: the only layer that reads the animation clock.
         Canvas(Modifier.fillMaxSize().graphicsLayer()) {
-            val cam = camera ?: return@Canvas
+            val cam = cameraState.camera ?: return@Canvas
             drawWater(board, cam, waves)
         }
         // Land: static except for camera and ownership.
         Canvas(Modifier.fillMaxSize().graphicsLayer()) {
-            val cam = camera ?: return@Canvas
+            val cam = cameraState.camera ?: return@Canvas
             inBoard(cam) { drawLand(board, game, line = max(1.7f, 1.2f / cam.scale)) }
         }
         // Overlay: selection, targets, arrows, banners — screen-sized where it carries text.
         Canvas(Modifier.fillMaxSize().graphicsLayer()) {
-            val cam = camera ?: return@Canvas
+            val cam = cameraState.camera ?: return@Canvas
             val px = 1f / cam.scale
             inBoard(cam) {
                 val dashed = Stroke(width = 2.5f * px, pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f * px, 6f * px)))
@@ -184,13 +201,29 @@ fun MapView(
                     drawPath(outline, Palette.Selected, style = Stroke(width = 4f * px, join = StrokeJoin.Round))
                 }
             }
-            arrow?.let { drawArrow(cam.boardToScreen(board.sites[it.from]), cam.boardToScreen(board.sites[it.to]), Palette.kingdom(it.kingdom)) }
-            map.provinces.indices.sortedBy { board.sites[it].y }.forEach { drawBanner(game, it, cam.boardToScreen(board.sites[it]), text) }
+            arrow?.let { drawArrow(cam.boardToScreen(board.sites[it.from]), cam.boardToScreen(board.sites[it.to]), game.colourOf(it.kingdom)) }
+            val bannerScale = markerScale(map, cam)
+            // Names fade in once a province is wide enough on screen to hold one.
+            val nameAlpha = ((PROVINCE * cam.scale / 1.dp.toPx() - 120f) / 40f).coerceIn(0f, 1f)
+            map.provinces.indices.sortedBy { board.sites[it].y }.forEach {
+                drawBanner(game, it, cam.boardToScreen(board.sites[it]), text, bannerScale, interactive, nameAlpha)
+            }
             if (source != null) {
                 for (t in targets) if (game.owner(t) != game.current) {
                     val chance = (game.winChance(source, t) * 100).roundToInt()
                     drawLabel("$chance%", cam.boardToScreen(board.sites[t]) - Offset(0f, 44.dp.toPx()), text)
                 }
+            }
+        }
+        // Effects: battle animations, on top of everything; only this layer ticks while they play.
+        Canvas(Modifier.fillMaxSize().graphicsLayer()) {
+            val cam = cameraState.camera ?: return@Canvas
+            val scale = markerScale(map, cam)
+            for (c in clashes) {
+                if (c.start == 0L) continue
+                val winner = if (c.attackerWon) game.colourOf(c.attacker) else c.defender?.let(game::colourOf) ?: Palette.Neutral.darker(0.3f)
+                val progress = ((now - c.start).toFloat() / CLASH_NANOS).coerceIn(0f, 1f)
+                drawClash(cam.boardToScreen(board.sites[c.province]), progress, scale, winner)
             }
         }
     }
@@ -232,7 +265,7 @@ private fun DrawScope.drawLand(board: BoardGeometry, game: GameState, line: Floa
     for (p in map.provinces) drawPath(board.provinces[p.id], Palette.terrain(p.terrain))
     for (p in map.provinces) {
         val owner = game.owner(p.id) ?: continue
-        val colour = Palette.kingdom(owner)
+        val colour = game.colourOf(owner)
         val path = board.provinces[p.id]
         drawPath(path, colour.copy(alpha = 0.16f))
         clipPath(path) { drawPath(path, colour.copy(alpha = 0.8f), style = Stroke(width = 7f, join = StrokeJoin.Round)) }
@@ -254,20 +287,37 @@ private fun DrawScope.drawLand(board: BoardGeometry, game: GameState, line: Floa
     board.props.forEach { drawProp(it, line) }
 }
 
+/** A province's width in board units, about. */
+private val PROVINCE = sqrt(MapGenerator.CELL_AREA).toFloat()
+
+/**
+ * How big banners, towers and resource icons draw (Design §8). In the fitted view: full size,
+ * down to 60% when provinces are small on screen (a phone). Zooming scales them half as much as
+ * the map, so they grow when zoomed in but leave room for the land.
+ */
+private fun DrawScope.markerScale(map: GameMap, cam: Camera): Float {
+    val fit = Camera.fit(map, IntSize(size.width.toInt(), size.height.toInt())).scale
+    val atFit = (fit * PROVINCE / 110.dp.toPx()).coerceIn(0.6f, 1f)
+    val zoom = cam.scale / fit
+    return (atFit * (1f + 0.5f * (zoom - 1f))).coerceIn(0.4f, 2.5f)
+}
+
+private val NameText = TextStyle(color = Palette.Ink, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.3.sp)
+
 private val BadgeText = TextStyle(color = Palette.Parchment, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-private val SmallText = TextStyle(color = Palette.Ink, fontSize = 10.sp, fontWeight = FontWeight.Bold)
 private val LabelText = TextStyle(color = Palette.Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold)
 
 /**
  * A province's army: a count plate in the owner's colour on the site, a pennant on a pole for an
  * owned province, a small keep under it for a capital, a dot while armies can still move, and
- * the yield underneath. Screen-sized, so it reads at any zoom.
+ * the yield underneath, and the province's name below that when [nameAlpha] > 0. Drawn at
+ * [scale] (see [markerScale]).
  */
-private fun DrawScope.drawBanner(game: GameState, province: Int, site: Offset, text: TextMeasurer) {
+private fun DrawScope.drawBanner(game: GameState, province: Int, site: Offset, text: TextMeasurer, scale: Float, interactive: Boolean, nameAlpha: Float) {
     val holding = game.holdings[province]
     val owner = holding.owner
-    val colour = owner?.let(Palette::kingdom) ?: Palette.Neutral
-    val dp = 1.dp.toPx()
+    val colour = owner?.let(game::colourOf) ?: Palette.Neutral
+    val dp = 1.dp.toPx() * scale
     if (owner != null) {
         val capital = game.kingdoms[owner].capital == province
         val poleFoot = if (capital) drawTower(site, colour, dp) else site - Offset(0f, 8 * dp)
@@ -282,7 +332,7 @@ private fun DrawScope.drawBanner(game: GameState, province: Int, site: Offset, t
         drawPath(flag, colour)
         drawPath(flag, colour.darker(0.45f), style = Stroke(1.2f * dp, join = StrokeJoin.Round))
     }
-    val style = if (owner == null) BadgeText.copy(color = Palette.Ink) else BadgeText
+    val style = (if (owner == null) BadgeText.copy(color = Palette.Ink) else BadgeText).let { it.copy(fontSize = it.fontSize * scale) }
     val count = text.measure(holding.armies.toString(), style)
     val plate = Size(maxOf(count.size.width + 12 * dp, 24 * dp), 19 * dp)
     val topLeft = site - Offset(plate.width / 2, plate.height / 2)
@@ -290,13 +340,31 @@ private fun DrawScope.drawBanner(game: GameState, province: Int, site: Offset, t
     drawRoundRect(colour, topLeft, plate, CornerRadius(6 * dp))
     drawRoundRect(colour.darker(0.45f), topLeft, plate, CornerRadius(6 * dp), style = Stroke(1.5f * dp))
     drawText(count, topLeft = site - Offset(count.size.width / 2f, count.size.height / 2f))
-    if (game.isHumanTurn && game.movable(province) > 0) {
+    if (interactive && game.isHumanTurn && game.movable(province) > 0) {
         val dot = topLeft + Offset(plate.width - 1 * dp, 1 * dp)
         drawCircle(Palette.Selected, 4 * dp, dot)
         drawCircle(Palette.Ink, 4 * dp, dot, style = Stroke(1 * dp))
     }
-    val yieldText = text.measure("+${game.map.provinces[province].yield}", SmallText)
-    drawText(yieldText, topLeft = site + Offset(-yieldText.size.width / 2f, plate.height / 2 + 1 * dp))
+    // What the province grows, as resource icons — the same row as on the province card.
+    val p = game.map.provinces[province]
+    val icons = List(p.terrain.yield) { p.terrain.resource } + if (p.coastal) List(COASTAL_YIELD) { Resource.Fish } else emptyList()
+    val icon = 12.5f * dp
+    var x = site.x - (icons.size * icon + (icons.size - 1) * dp) / 2
+    val y = site.y + plate.height / 2 + 1.5f * dp
+    for (r in icons) {
+        withTransform({
+            translate(x, y)
+            scale(icon / 24f, icon / 24f, pivot = Offset.Zero)
+        }) { resourceIcon(r) }
+        x += icon + dp
+    }
+    if (nameAlpha > 0f) {
+        val name = text.measure(p.name, NameText.copy(fontSize = NameText.fontSize * scale))
+        val at = Offset(site.x - name.size.width / 2f, y + icon + 1.5f * dp)
+        // A parchment halo keeps the name readable on any terrain.
+        drawText(name, color = Palette.Parchment, topLeft = at, alpha = nameAlpha * 0.85f, drawStyle = Stroke(3 * dp, join = StrokeJoin.Round))
+        drawText(name, topLeft = at, alpha = nameAlpha)
+    }
 }
 
 /** A little stone tower with a cone roof in the kingdom's colour; returns the roof's tip. */

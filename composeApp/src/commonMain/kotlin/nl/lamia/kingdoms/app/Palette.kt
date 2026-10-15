@@ -3,6 +3,7 @@ package nl.lamia.kingdoms.app
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import nl.lamia.kingdoms.core.map.Terrain
+import nl.lamia.kingdoms.core.rules.GameState
 
 /** Cozy cel-shaded palette (Design §8): flat fills, darker same-hue outlines, never black. */
 object Palette {
@@ -50,17 +51,23 @@ object Palette {
         Terrain.Marsh -> Color(0xFFAAC6A2)
     }
 
-    private val kingdoms = listOf(
+    /** The colours a kingdom can wear; [nl.lamia.kingdoms.core.rules.Kingdom.colour] indexes this. */
+    val kingdoms = listOf(
         Color(0xFF4A7BD0), // blue
         Color(0xFFD0524A), // red
         Color(0xFFD9A21B), // gold
         Color(0xFF8C5BC4), // purple
         Color(0xFF2A9D8F), // teal
         Color(0xFFE07A2E), // orange
+        Color(0xFFD6649A), // rose
+        Color(0xFF5B6B8C), // slate
     )
 
-    fun kingdom(id: Int) = kingdoms[id % kingdoms.size]
+    fun kingdom(colour: Int) = kingdoms[colour.mod(kingdoms.size)]
 }
+
+/** Kingdom [k]'s chosen colour. */
+fun GameState.colourOf(k: Int) = Palette.kingdom(kingdoms[k].colour)
 
 /** The same hue, darker: cel outlines and shade bands. */
 fun Color.darker(amount: Float = 0.3f) = lerp(this, Color(0xFF2A2420), amount)

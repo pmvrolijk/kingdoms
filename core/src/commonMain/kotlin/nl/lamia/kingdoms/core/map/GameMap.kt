@@ -3,6 +3,8 @@ package nl.lamia.kingdoms.core.map
 /** A land province. [outline] is a closed ring; [site] always lies inside it. */
 data class Province(
     val id: Int,
+    /** A generated place name, unique within the map. */
+    val name: String,
     val site: Point,
     val terrain: Terrain,
     /** Borders the sea (any sea, including inland seas). */

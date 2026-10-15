@@ -34,20 +34,22 @@ class PlayTest {
     fun thePlayerCanMoveEveryTurn() = play(TurnOrder.Fixed)
 
     @Test
-    fun throughTheAppAfterSwitchingTurnOrder() = playApp(order = TurnOrder.Fixed, restarts = 0) {
+    fun throughTheNewGameScreenWithFixedTurns() = playApp(order = TurnOrder.Fixed, restarts = 0, playing = false) {
         onNodeWithText("Fixed").performClick()
+        onNodeWithText("Start").performClick()
     }
 
     @Test
-    fun throughTheAppAfterRestart() = playApp(order = TurnOrder.Shuffled, restarts = 1) {
+    fun throughTheAppAfterRestart() = playApp(order = TurnOrder.Shuffled, restarts = 1, playing = true) {
+        onNodeWithText("Menu").performClick()
         onNodeWithText("Restart").performClick()
     }
 
-    /** The full App, after [setup] clicks in the debug bar; the start mirrors what App creates. */
-    private fun playApp(order: TurnOrder, restarts: Int, setup: ComposeUiTest.() -> Unit) = runComposeUiTest {
+    /** The full App from a known setup, after [setup] clicks; the start mirrors what App creates. */
+    private fun playApp(order: TurnOrder, restarts: Int, playing: Boolean, setup: ComposeUiTest.() -> Unit) = runComposeUiTest {
         val map = MapGenerator.generate(MapConfig.of(MapSize.Medium, seed = 1))
         var state = NewGame.create(map, kingdoms = 4, seed = 1L + restarts, turnOrder = order)
-        setContent { App(onGameChange = { state = it }) }
+        setContent { App(Setup(), playing = playing, onGameChange = { state = it }) }
         setup()
         waitForIdle()
         playTurns(map, expected = NewGame.create(map, kingdoms = 4, seed = 1L + restarts, turnOrder = order)) { state }

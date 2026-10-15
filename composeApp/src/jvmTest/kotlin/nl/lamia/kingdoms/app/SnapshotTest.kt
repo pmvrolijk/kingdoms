@@ -7,7 +7,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.use
 import nl.lamia.kingdoms.core.map.MapConfig
@@ -32,9 +35,58 @@ class SnapshotTest {
 
     @Test
     fun rendersTheMap() {
-        ImageComposeScene(width, height) { App() }.use { scene ->
+        ImageComposeScene(width, height) { App(Setup(), playing = true) }.use { scene ->
             scene.render()
             scene.save("app.png", frame = 1)
+        }
+    }
+
+    @Test
+    fun newGameScreen() {
+        ImageComposeScene(width, height) { App(Setup()) }.use { scene ->
+            scene.render()
+            scene.save("new-game.png", frame = 1)
+        }
+        ImageComposeScene(2556, 1179, density = Density(3f)) { App(Setup()) }.use { scene ->
+            scene.render()
+            scene.save("new-game-phone.png", frame = 1)
+        }
+    }
+
+    @Test
+    fun zoomingScalesMarkersAndShowsNames() {
+        ImageComposeScene(width, height) { App(Setup(), playing = true) }.use { scene ->
+            scene.render()
+            val at = Offset(640f, 400f)
+            // 1.1× per wheel notch: about 1.6×, then 2.6× (names fade in), then 0.5×.
+            for ((notches, name) in listOf(5 to "zoom-1.6.png", 5 to "zoom-2.6.png")) {
+                repeat(notches) { scene.sendPointerEvent(PointerEventType.Scroll, at, scrollDelta = Offset(0f, -1f)) }
+                scene.save(name, frame = 1)
+            }
+            repeat(17) { scene.sendPointerEvent(PointerEventType.Scroll, at, scrollDelta = Offset(0f, 1f)) }
+            scene.save("zoom-0.5.png", frame = 1)
+        }
+        ImageComposeScene(2556, 1179, density = Density(3f)) { App(Setup(), playing = true) }.use { scene ->
+            scene.render()
+            repeat(10) { scene.sendPointerEvent(PointerEventType.Scroll, Offset(1278f, 590f), scrollDelta = Offset(0f, -1f)) }
+            scene.save("zoom-phone-2.6.png", frame = 1)
+        }
+    }
+
+    @Test
+    fun previewMapStaysBehindTheSettings() {
+        ImageComposeScene(width, height) { App(Setup()) }.use { scene ->
+            // Points across the settings panel, down to the Start button.
+            val panel = listOf(300 to 160, 100 to 330, 200 to 400, 60 to 300)
+            fun pixel() = scene.render(nanoTime = 3_000_000_000L).toComposeImageBitmap().toPixelMap().let { m -> panel.map { (x, y) -> m[x, y] } }
+            val before = pixel()
+            // Drag the preview map left, over where the settings are.
+            val from = Offset(800f, 400f)
+            scene.sendPointerEvent(PointerEventType.Press, from, timeMillis = 1000)
+            for (i in 1..10) scene.sendPointerEvent(PointerEventType.Move, from - Offset(50f * i, 0f), timeMillis = 1000L + 20 * i)
+            scene.sendPointerEvent(PointerEventType.Release, from - Offset(500f, 0f), timeMillis = 1300)
+            scene.save("new-game-dragged.png", frame = 2)
+            assertEquals(before, pixel())
         }
     }
 
@@ -49,12 +101,24 @@ class SnapshotTest {
         }
         val camera = Camera.fit(map, IntSize(width, height))
 
-        ImageComposeScene(width, height) { App() }.use { scene ->
+        ImageComposeScene(width, height) { App(Setup(), playing = true) }.use { scene ->
             scene.render()
             scene.tap(camera.toScreen(map.provinces[source].site), frame = 1)
             scene.save("selected.png", frame = 2)
             scene.tap(camera.toScreen(map.provinces[target].site), frame = 3)
+            scene.saveAt("clash-early.png", 3_250_000_000L)
+            scene.saveAt("clash.png", 3_500_000_000L)
+            scene.saveAt("clash-late.png", 3_750_000_000L)
             scene.save("attacked.png", frame = 4)
+        }
+    }
+
+    @Test
+    fun phoneLandscape() {
+        // A 6.1" phone in landscape: 2556 × 1179 px at 3×.
+        ImageComposeScene(2556, 1179, density = Density(3f)) { App(Setup(), playing = true) }.use { scene ->
+            scene.render()
+            scene.save("phone.png", frame = 1)
         }
     }
 
@@ -97,10 +161,53 @@ class SnapshotTest {
         }
     }
 
+    @Test
+    fun noEnemyArrowOnThePlayersTurn() {
+        val map = MapGenerator.generate(MapConfig.of(MapSize.Medium, seed = 1))
+        val start = NewGame.create(map, kingdoms = 4, seed = 1).let { game ->
+            game.copy(current = 1, holdings = game.holdings.map { if (it.owner == 1) it.copy(fresh = it.armies) else it })
+        }
+        var latest = start
+        var moves = 0
+        ImageComposeScene(width, height) {
+            GameScreen(start, onNewGame = {}, Modifier.fillMaxSize(), onChange = { latest = it; moves++ })
+        }.use { scene ->
+            // The waves' phase depends on the first frame times; the fresh render below repeats them.
+            val frames = mutableListOf<Long>()
+            val deadline = System.currentTimeMillis() + 60_000
+            while (!latest.isHumanTurn && System.currentTimeMillis() < deadline) {
+                frames += System.nanoTime()
+                scene.render(nanoTime = frames.last())
+                Thread.sleep(50)
+            }
+            assertTrue(latest.isHumanTurn && moves > 3, "the AIs played into the player's turn")
+            assertEquals(start.map.config.seed, latest.map.config.seed)
+            Thread.sleep(1_200) // let the last battle animation finish
+            scene.render(nanoTime = System.nanoTime())
+            val end = System.nanoTime() + 5_000_000_000L
+            val played = scene.render(nanoTime = end)
+            File("build/snapshots/players-turn.png").writeBytes(played.encodeToData(EncodedImageFormat.PNG)!!.bytes)
+            val fresh = ImageComposeScene(width, height) { GameScreen(latest, onNewGame = {}, Modifier.fillMaxSize()) }.use {
+                frames.take(3).forEach { t -> it.render(nanoTime = t) }
+                it.render(nanoTime = end)
+            }
+            // The same state without history: only the chronicle (top right) may differ.
+            val a = played.toComposeImageBitmap().toPixelMap()
+            val b = fresh.toComposeImageBitmap().toPixelMap()
+            val differing = (0 until width).sumOf { x -> (0 until height).count { y -> !(x > 900 && y < 330) && a[x, y] != b[x, y] } }
+            assertEquals(0, differing, "pixels differ outside the chronicle: an arrow left over from the AI?")
+        }
+    }
+
     private fun ImageComposeScene.tap(at: Offset, frame: Int) {
         sendPointerEvent(PointerEventType.Press, at, timeMillis = frame * 1000L)
         sendPointerEvent(PointerEventType.Release, at, timeMillis = frame * 1000L + 50)
         render(nanoTime = frame * 1_000_000_000L + 100_000_000L)
+    }
+
+    private fun ImageComposeScene.saveAt(name: String, nanoTime: Long) {
+        val file = File("build/snapshots/$name").apply { parentFile.mkdirs() }
+        file.writeBytes(render(nanoTime).encodeToData(EncodedImageFormat.PNG)!!.bytes)
     }
 
     private fun ImageComposeScene.save(name: String, frame: Int) {

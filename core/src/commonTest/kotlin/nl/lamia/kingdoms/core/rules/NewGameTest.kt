@@ -74,6 +74,31 @@ class NewGameTest {
     }
 
     @Test
+    fun seatsCarryNameColourAndDifficulty() {
+        val seats = listOf(
+            NewGame.Seat("Ours", colour = 6, human = true),
+            NewGame.Seat("Theirs", colour = 2, human = false, difficulty = Difficulty.Hard),
+            NewGame.Seat("Others", colour = 7, human = false, difficulty = Difficulty.Easy),
+        )
+        val game = NewGame.create(Fixtures.map, seats, seed = 5)
+        assertEquals(listOf("Ours", "Theirs", "Others"), game.kingdoms.map { it.name })
+        assertEquals(listOf(6, 2, 7), game.kingdoms.map { it.colour })
+        assertEquals(listOf(Difficulty.Normal, Difficulty.Hard, Difficulty.Easy), game.kingdoms.map { it.difficulty })
+        assertEquals(listOf(true, false, false), game.kingdoms.map { it.human })
+    }
+
+    @Test
+    fun peopleMoveFirstInRoundOneWhereverTheySit() {
+        val seats = NewGame.seats(4, humans = setOf(2))
+        val game = NewGame.create(Fixtures.map, seats, seed = 5)
+        assertEquals(2, game.current)
+        assertEquals(2, game.order.first())
+        assertEquals(listOf(0, 1, 2, 3), game.order.sorted())
+        game.provincesOf(2).forEach { assertEquals(game.holdings[it].armies, game.holdings[it].fresh) }
+        game.provincesOf(0).forEach { assertEquals(0, game.holdings[it].fresh) }
+    }
+
+    @Test
     fun sameSeedSameSetup() {
         val map = Fixtures.map
         assertEquals(NewGame.create(map, 4, seed = 9), NewGame.create(map, 4, seed = 9))

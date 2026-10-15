@@ -2,7 +2,18 @@ package nl.lamia.kingdoms.core.rules
 
 import nl.lamia.kingdoms.core.map.GameMap
 
-data class Kingdom(val id: Int, val name: String, val human: Boolean, val capital: Int)
+/** How well an AI kingdom plays (Design §5). Ignored for human kingdoms. */
+enum class Difficulty { Easy, Normal, Hard }
+
+/** A kingdom. [colour] indexes the app's kingdom palette; it is the player's choice, not the id. */
+data class Kingdom(
+    val id: Int,
+    val name: String,
+    val human: Boolean,
+    val capital: Int,
+    val colour: Int = id,
+    val difficulty: Difficulty = Difficulty.Normal,
+)
 
 /** How the turn order is set each round (Design §4.2). */
 enum class TurnOrder {

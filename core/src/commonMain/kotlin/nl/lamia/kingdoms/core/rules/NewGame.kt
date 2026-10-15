@@ -34,13 +34,23 @@ object NewGame {
 
     private const val SETUP = 100L
 
+    /** One kingdom to set up: who plays it and how it looks. [colour] indexes the app's palette. */
+    data class Seat(val name: String, val colour: Int, val human: Boolean, val difficulty: Difficulty = Difficulty.Normal)
+
+    /** Default seats: [kingdoms] kingdoms with the standard names and colours, [humans] played by people. */
+    fun seats(kingdoms: Int, humans: Set<Int> = setOf(0)) =
+        (0 until kingdoms).map { Seat(NAMES[it], colour = it, human = it in humans) }
+
     fun create(
         map: GameMap,
         kingdoms: Int,
         seed: Long,
         humans: Set<Int> = setOf(0),
         turnOrder: TurnOrder = TurnOrder.Shuffled,
-    ): GameState {
+    ): GameState = create(map, seats(kingdoms, humans), seed, turnOrder)
+
+    fun create(map: GameMap, seats: List<Seat>, seed: Long, turnOrder: TurnOrder = TurnOrder.Shuffled): GameState {
+        val kingdoms = seats.size
         require(kingdoms in MIN_KINGDOMS..MAX_KINGDOMS) { "kingdoms must be $MIN_KINGDOMS..$MAX_KINGDOMS, was $kingdoms" }
         require(map.config.fits(kingdoms)) { "${map.provinces.size} provinces are too few for $kingdoms kingdoms" }
         val random = Random(mix(seed, SETUP))
@@ -53,36 +63,42 @@ object NewGame {
         // Seats are shuffled over the territories, so turn order says nothing about map position.
         val seat = (0 until kingdoms).shuffled(random)
         val capitals = (0 until kingdoms).map { k -> best.capitals[seat.indexOf(k)] }
+        // Round 1: people first (by seat), then the AIs — shuffled under Shuffled order, so no AI is
+        // always the one that moves right after the player.
+        val humans = seats.indices.filter { seats[it].human }
+        val ais = seats.indices.filter { !seats[it].human }
+        val order = humans + if (turnOrder == TurnOrder.Shuffled) ais.shuffled(random) else ais
+        val first = order.first()
         val holdings = map.provinces.indices.map { p ->
             when (val t = best.owner[p]) {
                 null -> Holding(owner = null, armies = random.nextInt(1, 4))
                 else -> {
                     val k = seat[t]
-                    val armies = if (p == capitals[k]) CAPITAL_ARMIES else START_ARMIES
-                    Holding(owner = k, armies = armies, fresh = if (k == 0) armies else 0)
+                    Holding(owner = k, armies = if (p == capitals[k]) CAPITAL_ARMIES else START_ARMIES)
                 }
             }
         }
-        // Compensation: a kingdom that starts poorer gets its shortfall, several rounds over, at its capital.
+        // Compensation: a kingdom that starts poorer gets its shortfall, several rounds over, at its
+        // capital; head to head, the first mover also gets the bonus (Design §4.1).
         val growth = (0 until kingdoms).map { k -> holdings.indices.filter { holdings[it].owner == k }.sumOf { map.provinces[it].yield } }
         val compensated = holdings.mapIndexed { p, h ->
             val k = h.owner
             if (k != null && p == capitals[k]) {
-                val headToHead = if (k == 0 && headToHeadAlternates(kingdoms, turnOrder)) HEAD_TO_HEAD_BONUS else 0
-                val extra = (growth.max() - growth[k]) * COMPENSATION + headToHead
-                h.copy(armies = h.armies + extra, fresh = if (h.fresh > 0) h.fresh + extra else 0)
+                val headToHead = if (k == first && headToHeadAlternates(kingdoms, turnOrder)) HEAD_TO_HEAD_BONUS else 0
+                h.copy(armies = h.armies + (growth.max() - growth[k]) * COMPENSATION + headToHead)
             } else {
                 h
             }
-        }
+        }.map { if (it.owner == first) it.copy(fresh = it.armies) else it }
         return GameState(
             map = map,
             seed = seed,
-            kingdoms = (0 until kingdoms).map { Kingdom(it, NAMES[it], human = it in humans, capital = capitals[it]) },
+            kingdoms = seats.mapIndexed { k, s -> Kingdom(k, s.name, s.human, capitals[k], s.colour, s.difficulty) },
             holdings = compensated,
             round = 1,
-            current = 0,
+            current = first,
             turnOrder = turnOrder,
+            order = order,
         )
     }
 

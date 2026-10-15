@@ -18,8 +18,12 @@ object MapGenerator {
     private const val CANDIDATES = 10
     private val SPACING = sqrt(CELL_AREA)
 
-    /** Voronoi vertices closer than this are one vertex; it also collapses near-zero edges. */
-    private val SNAP = SPACING * 0.01
+    /**
+     * Corners closer than this are the same Voronoi vertex computed by different cells, differing
+     * only by rounding. It must stay tiny: a larger value (it was 1% of spacing) chains distinct
+     * corners together and pulls map-edge corners inward, so the cells no longer tile the map.
+     */
+    private val SNAP = SPACING * 1e-6
 
     /** Border segments shorter than this are not subdivided further. */
     private val MIN_SEGMENT = SPACING * 0.08
@@ -31,14 +35,23 @@ object MapGenerator {
     private const val ELEVATION = 4L
     private const val MOISTURE = 5L
     private const val FEATURES = 6L
+    private const val NAMES = 7L
 
     fun generate(config: MapConfig): GameMap {
         // Land is taken only from interior cells (not touching the map edge), so it never gets
         // cut off by the rectangle. seaFraction is the share of interior cells that stay sea.
         val interiorNeeded = ceil(config.landProvinces / (1.0 - config.seaFraction)).toInt()
         var cellCount = interiorNeeded + (4 * sqrt(interiorNeeded.toDouble())).toInt() + 4
+        var attempt = 0L
         while (true) {
-            val layout = Layout.build(config.seed, cellCount)
+            // An inconsistent layout (two cells disagreeing on a shared edge) should not happen
+            // since corners are clustered transitively; if it ever does, try other sites rather
+            // than fail. Deterministic: the same seed always takes the same attempts.
+            val layout = runCatching { Layout.build(config.seed, cellCount, attempt) }.getOrNull()
+            if (layout == null) {
+                attempt++
+                continue
+            }
             val shortfall = interiorNeeded - layout.interior.count { it }
             if (shortfall <= 0) {
                 val land = selectLand(config, layout)
@@ -63,11 +76,12 @@ object MapGenerator {
         val neighbours: List<List<Int>> = labels.map { l -> l.filter { it >= 0 } }
 
         companion object {
-            fun build(seed: Long, cellCount: Int): Layout {
+            fun build(seed: Long, cellCount: Int, attempt: Long = 0): Layout {
                 val area = cellCount * CELL_AREA
                 val width = sqrt(area * ASPECT)
                 val height = area / width
-                val random = Random(mix(seed, SITES, cellCount.toLong()))
+                // Attempt 0 keeps the original stream, so existing seeds keep their maps.
+                val random = Random(if (attempt == 0L) mix(seed, SITES, cellCount.toLong()) else mix(seed, SITES, cellCount.toLong(), attempt))
                 var sites = bestCandidates(cellCount, width, height, random)
                 repeat(LLOYD_ROUNDS) {
                     sites = Voronoi.cells(sites, width, height).map { Polygons.centroid(it.vertices) }
@@ -96,24 +110,48 @@ object MapGenerator {
 
             /** Snaps the cells' independently computed corners into one shared vertex table. */
             private fun shared(width: Double, height: Double, sites: List<Point>, cells: List<Cell>): Layout {
-                val vertices = ArrayList<Point>()
-                val grid = HashMap<Long, MutableList<Int>>()
+                // Union-find over every corner of every cell: corners closer than SNAP are one
+                // vertex, transitively. A greedy "first one within SNAP" is not transitive, and with
+                // three near-coincident corners two neighbouring cells could disagree on their
+                // shared edge (seen on 2 of 3000 Medium seeds).
+                val corners = cells.flatMap { it.vertices }
+                val parent = IntArray(corners.size) { it }
+                fun find(i: Int): Int {
+                    var r = i
+                    while (parent[r] != r) r = parent[r]
+                    var j = i
+                    while (parent[j] != r) j = parent[j].also { parent[j] = r }
+                    return r
+                }
                 fun gridKey(gx: Long, gy: Long) = gx shl 32 xor (gy and 0xFFFFFFFFL)
-                fun vertexOf(p: Point): Int {
+                val grid = HashMap<Long, MutableList<Int>>()
+                corners.forEachIndexed { i, p ->
                     val gx = floor(p.x / SNAP).toLong()
                     val gy = floor(p.y / SNAP).toLong()
                     for (dx in -1L..1L) for (dy in -1L..1L) {
-                        grid[gridKey(gx + dx, gy + dy)]?.forEach { if (vertices[it].distanceTo(p) < SNAP) return it }
+                        grid[gridKey(gx + dx, gy + dy)]?.forEach { j ->
+                            if (corners[j].distanceTo(p) < SNAP) {
+                                val a = find(i)
+                                val b = find(j)
+                                if (a != b) parent[maxOf(a, b)] = minOf(a, b)
+                            }
+                        }
                     }
-                    vertices += p
-                    grid.getOrPut(gridKey(gx, gy)) { mutableListOf() } += vertices.lastIndex
-                    return vertices.lastIndex
+                    grid.getOrPut(gridKey(gx, gy)) { mutableListOf() } += i
+                }
+                // One vertex per cluster, at its lowest-index corner; numbered in first-seen order.
+                val vertices = ArrayList<Point>()
+                val vertexOfRoot = HashMap<Int, Int>()
+                val vertexOfCorner = IntArray(corners.size) { i ->
+                    val root = find(i)
+                    vertexOfRoot.getOrPut(root) { vertices += corners[root]; vertices.lastIndex }
                 }
 
                 val rings = ArrayList<IntArray>(cells.size)
                 val labels = ArrayList<IntArray>(cells.size)
+                var corner = 0
                 for (cell in cells) {
-                    val ring = cell.vertices.map(::vertexOf).toMutableList()
+                    val ring = cell.vertices.map { vertexOfCorner[corner++] }.toMutableList()
                     val label = cell.labels.toMutableList()
                     // Drop zero-length edges left by snapping; the following edge keeps its label.
                     var k = 0
@@ -208,9 +246,14 @@ object MapGenerator {
         val coastal = landCells.filter { i -> layout.neighbours[i].any { !land[it] } }.toSet()
         val terrain = assignTerrain(config, layout, land, landCells, coastal)
 
+        val names = ProvinceNames.generate(
+            landCells.map { terrain.getValue(it) to (it in coastal) },
+            Random(mix(config.seed, NAMES)),
+        )
         val provinces = landCells.map { i ->
             Province(
                 id = provinceOf[i],
+                name = names[provinceOf[i]],
                 site = layout.sites[i],
                 terrain = terrain.getValue(i),
                 coastal = i in coastal,

@@ -3,6 +3,8 @@ package nl.lamia.kingdoms.core.ai
 import nl.lamia.kingdoms.core.map.MapConfig
 import nl.lamia.kingdoms.core.map.MapGenerator
 import nl.lamia.kingdoms.core.map.MapSize
+import nl.lamia.kingdoms.core.rules.Difficulty
+import nl.lamia.kingdoms.core.rules.NewGame
 import nl.lamia.kingdoms.core.rules.TurnOrder
 import kotlin.test.Test
 
@@ -17,6 +19,19 @@ class TuningReport {
         if (System.getenv("TUNING") == null) return
         val games = System.getenv("TUNING_GAMES")?.toLong() ?: 300L
         val order = System.getenv("TUNING_ORDER")?.let(TurnOrder::valueOf) ?: TurnOrder.Shuffled
+        // Difficulty: one kingdom at each level (rotating seat) against three Normal; fair is 25%.
+        for (d in Difficulty.entries) {
+            var wins = 0
+            for (seed in 1L..games) {
+                val seat = (seed % 4).toInt()
+                val map = MapGenerator.generate(MapConfig.of(MapSize.Medium, seed))
+                var s = NewGame.create(map, 4, seed, humans = emptySet(), turnOrder = order)
+                s = s.copy(kingdoms = s.kingdoms.map { if (it.id == seat) it.copy(difficulty = d) else it })
+                while (!s.isOver && s.round <= 200) s = step(s, HeuristicAi()).state
+                if (s.winner == seat) wins++
+            }
+            println("REPORT $order difficulty $d vs 3 Normal (Medium): wins ${100 * wins / games}%")
+        }
         val ais = listOf("balanced" to HeuristicAi { Personality.Balanced }, "mixed" to HeuristicAi())
         for ((label, ai) in ais) for (size in MapSize.entries) for (kingdoms in listOf(2, 4, 6)) {
             if (!MapConfig.of(size, 1).fits(kingdoms)) continue

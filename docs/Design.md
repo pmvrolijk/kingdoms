@@ -76,8 +76,11 @@ action always yields the same next state, and the state stays a plain serializab
    exact point count — then 2 rounds of Lloyd relaxation so cells are similar in size.
 2. **Voronoi.** Each cell is the rectangle clipped by the perpendicular bisector to every other
    site, nearest first, stopping once no bisector can reach it. Corners computed by neighbouring
-   cells are snapped into one shared vertex table (snap distance 1% of cell spacing, which also
-   collapses near-zero edges); every interior edge must then appear in both cells.
+   cells are merged into one shared vertex table by union-find over corners closer than a
+   millionth of the cell spacing — the same vertex up to rounding, nothing more; every interior
+   edge must then appear in both cells. (A 1% snap distance crashed on 2 of 3000 Medium seeds
+   and, made transitive, mis-tiled ~2% of maps; `ManySeedsTest` checks 9000 maps.) If a layout
+   were ever inconsistent the generator retries with a salted site stream, deterministically.
 3. **Land and sea.** Cells touching the map edge are always sea. Land grows from the
    best-scoring interior cell, each step adding the best-scoring interior cell adjacent to the
    land so far, until it has exactly `landProvinces` cells. Score is low-frequency value noise
@@ -88,6 +91,10 @@ action always yields the same next state, and the state stays a plain serializab
    convex quad whose controls stay within the fan triangles (edge + site) of the two convex cells,
    so borders never cross each other or self-intersect, and each site stays inside its province.
 5. **Terrain** assigned per province (§3.3), **features** per border (§3.4).
+6. **Names.** Each province gets a generated place name, unique within the map: a
+   countryside prefix (Ash, Thorn, Willow…) and a suffix that fits the terrain (-ford for
+   plains, -wood for forest, -crag for mountains, -fen for marsh, -down for hills; a coastal
+   province often gets -haven, -mouth, -port).
 
 Starting positions are a rule, not geometry (§4.1).
 
@@ -165,7 +172,9 @@ count matches.
 
 ### 4.1 Setup
 
-- 2–6 kingdoms; default 4 (player + 3 AI). Kingdom 0 is the human player.
+- 2–6 kingdoms; default 4 (player + 3 AI), set up as **seats** on the new-game screen: each has
+  a name, a colour (from eight) and either a person or an AI difficulty (§5). The first seat is
+  the player.
 - Each kingdom starts with a **capital** and two neighbouring provinces. The setup tries 80
   candidate layouts — farthest-point capitals over graph distance from a random first pick, one
   refinement pass, then starting neighbours claimed in passes where the poorest kingdom picks
@@ -182,9 +191,9 @@ count matches.
 
 ### 4.2 Round and turn
 
-A **round** is every living kingdom taking one turn. In round 1 the order is by kingdom id, so
-the player moves first. From round 2 the order follows the game's `TurnOrder`, **Shuffled** by
-default:
+A **round** is every living kingdom taking one turn. In round 1 people move first, then the AIs
+— in random order under Shuffled, by seat otherwise. From round 2 the order follows the game's
+`TurnOrder`, **Shuffled** by default:
 
 | TurnOrder | Order each round |
 | --- | --- |
@@ -270,6 +279,14 @@ returns one action; the AI is asked again until it ends its turn.
    nearest front: nearest-front supply deadlocked equal stacks across mountain borders.
 3. **End turn.**
 
+**Difficulty** (chosen per AI on the new-game screen) changes skill, not personality:
+
+| Difficulty | Plays | Measured: one vs three Normal (fair 25%) |
+| --- | --- | --- |
+| Easy | Attacks only at ≥ 90%, commits for 80%, supplies the nearest front every other round | 14% |
+| Normal | As above | 23% |
+| Hard | Normal, plus: fronts an enemy stack could take next turn get supply first; +2 value on the strongest rival's provinces | 34% |
+
 | Personality | Boldness | Confidence | Neutral bias | Plays seats |
 | --- | --- | --- | --- | --- |
 | Balanced | 0.70 | 0.95 | 1.0 | 1, 4 |
@@ -277,19 +294,54 @@ returns one action; the AI is asked again until it ends its turn.
 | Cautious | 0.85 | 0.99 | 2.0 | 3 |
 
 The UI plays AI turns one action at a time (≈450 ms per move, 200 ms per end of turn), draws the
-latest move as an arrow in the mover's colour, and offers **Skip** to resolve the remaining AI
+latest move as an arrow in the mover's colour (gone once that kingdom ends its turn), and offers **Skip** to resolve the remaining AI
 turns at once.
 
 ## 6. Screens and interaction
 
-- **Title** — new game (kingdom count, map size preset or custom province count, map seed
-  optional), resume.
-- **Game** — the map with pan/zoom, a small HUD: current kingdom, round, armies growing next round,
-  End Turn button. Each province shows its yield (+1 to +3) next to its army count.
-- **Result** — victory/defeat, play again.
+Landscape only: phones are locked to landscape (Android `sensorLandscape`, iOS landscape
+orientations); desktop windows are landscape by default.
 
-Tap targets: a selected source highlights valid targets; tapping elsewhere deselects. Hit-testing
-inverts the 2.5D projection (§8) and does point-in-polygon against the province outline.
+### 6.1 In game
+
+The map fills the screen; the HUD sits in the corners on parchment panels.
+
+- **Top left — kingdom strength.** Three 100% stacked bars, one segment per living kingdom in
+  its colour: *production* (growth per round), *territory* (provinces), *armies* (total). The
+  player's segment is outlined and the player's own value is printed at the end of each bar.
+- **Top right — turn.** Round number; this round's turn order as coloured dots, the current
+  kingdom enlarged; whose move it is (an AI shows its personality); **End turn** on the player's
+  turn, **Skip** during AI turns; a Menu button. Under it, a short **chronicle** of the last
+  three events, told with names: "Aldmere takes Thornwick from Brightvale", "Brightvale is
+  defeated at Millbrook", "Dunmoor falls to Aldmere" — kingdom names in their colours, the
+  numbers dimmed, older lines faded.
+- **Selected province — card.** Bottom of the screen, on the side away from the province so it
+  never covers it: terrain icon, province name, terrain, owner, capital; *Grows* as one resource icon per army grown
+  (coastal Plains: grain, grain, fish); armies with a shield icon and — for the current kingdom's
+  provinces — a stacked bar of *can move* / *stays* (the one army that must remain) / *fatigued*
+  (moved this turn), with a legend; defended borders with feature icons and multipliers; and a
+  one-line how-to while a move is possible.
+- **Moves.** Click a province, then a neighbour: all movable armies go. Right-click or long-press
+  the neighbour instead to open the **amount picker** next to the target: a slider from 1 to all
+  movable, the win chance for an attack and about how many would survive a win, Cancel and
+  Move/Attack. An arrow shows the pending move.
+- **Map labels.** Dashed outlines on valid targets with win chances. In the fitted view, banners
+  shrink to 60% when provinces get small on screen; zooming scales them half as much as the map.
+  Zoomed in (a province over ~120 dp wide on screen), each province's name fades in under its
+  banner.
+- **Game over** — a centred panel: victory or defeat, rounds played, New game.
+
+### 6.2 New game, menu, result
+
+- **New game** (also the title screen): on the left the settings — map size (presets and ±2
+  provinces), seed (editable, Shuffle for a new one; random on launch), turn order, and the
+  kingdoms: colour swatch (tap for the next unused colour), editable name, *You* or an AI
+  difficulty, remove; Add a kingdom up to six; **Start** stays pinned at the bottom. On the right a
+  live preview of the actual map with each kingdom's starting territory in its colour. Start is
+  disabled, with a reason, when the map is too small for the kingdoms.
+- **Menu** (in game): Resume, Restart (same setup, new game seed), New game….
+- **Result**: Victory / Defeat / "X wins" in the winner's colour, rounds played, Play again,
+  New game….
 
 ## 7. Save and resume
 
@@ -317,13 +369,18 @@ Cozy, cartoony, cel-shaded — a painted tabletop diorama seen from above at a s
   border: rivers as ribbons, lakes as ovals at the border's middle, ridges as hills, mountain
   ranges as peaks, marsh as reeds and pools along the line.
 - **Water.** Sea-coloured background with drifting wave marks and pulsing foam.
-- **Armies.** On each site, a count plate in the owner's colour (neutral: parchment) with the
-  yield under it, a white dot while armies can still move, a pennant on a pole for owned
+- **Armies.** On each site, a count plate in the owner's colour (neutral: parchment) with what
+  the province grows under it as resource icons (as on the card), a white dot while armies can still move, a pennant on a pole for owned
   provinces, and a small tower with a roof in the kingdom's colour under the pennant for a
-  capital. These are screen-sized so they read at any zoom.
-- **Performance.** Three stacked canvases: water (the only one reading the animation clock),
+  capital, then the province's name when zoomed in (§6.1). They scale with the map at half its
+  rate, so they read zoomed out and grow, less than the land, zoomed in.
+- **Battles.** Under a second, cartoonish and bloodless: two swords swing in and cross above the
+  defending plate, a small spark where they meet, dust puffs at ground level around the plate,
+  then a ring in the winner's colour spreads from it. AI moves wait for it to finish.
+- **Performance.** Four stacked canvases: water (the only one reading the animation clock),
   land (walls, terrain, ownership, borders, props — redrawn only on camera or ownership change),
-  overlay (selection, targets, arrows, banners). Each has its own `graphicsLayer`; without it the
+  overlay (selection, targets, arrows, banners), and effects (battle animations, ticking only
+  while one plays). Each has its own `graphicsLayer`; without it the
   water's per-frame invalidation re-runs the land's draw every frame (measured: 150 land draws in
   150 frames without, 1 with).
 

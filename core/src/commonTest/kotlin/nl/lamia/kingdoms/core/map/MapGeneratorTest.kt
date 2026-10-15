@@ -123,6 +123,13 @@ class MapGeneratorTest {
     }
 
     @Test
+    fun everyProvinceHasAUniqueName() = forEachMap { map ->
+        val names = map.provinces.map { it.name }
+        assertTrue(names.all { it.isNotBlank() })
+        assertEquals(names.size, names.toSet().size, "duplicate names in seed ${map.config.seed}: $names")
+    }
+
+    @Test
     fun sameConfigSameMap() {
         configs.take(3).forEach { assertEquals(MapGenerator.generate(it), MapGenerator.generate(it)) }
     }

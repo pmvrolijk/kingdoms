@@ -6,7 +6,9 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.rightClick
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
@@ -41,8 +43,8 @@ class PickerTest {
         mainClock.advanceTimeBy(400)
         onRoot().performMouseInput { longClick(camera.toScreen(map.provinces[target].site)) }
         waitForIdle()
-        onNodeWithText("−").performClick()
-        onNodeWithText("Go").performClick()
+        onNodeWithTag("amount").performSemanticsAction(SemanticsActions.SetProgress) { it(movable - 1f) }
+        onNodeWithTag("confirm-move").performClick()
         waitForIdle()
         assertEquals(1, state.movable(source), "picked ${movable - 1} of $movable, so one movable army stays")
     }
@@ -56,6 +58,7 @@ class PickerTest {
         val camera = Camera.fit(map, onRoot().fetchSemanticsNode().size)
         val source = start.provincesOf(0).maxBy { start.movable(it) }
         val target = map.provinces[source].neighbours.first()
+        val movable = start.movable(source)
 
         onRoot().performMouseInput { click(camera.toScreen(map.provinces[source].site)) }
         mainClock.advanceTimeBy(400)
@@ -63,8 +66,8 @@ class PickerTest {
         waitForIdle()
         val shot = File("build/snapshots/picker.png").apply { parentFile.mkdirs() }
         ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", shot)
-        onNodeWithText("−").performClick()
-        onNodeWithText("Go").performClick()
+        onNodeWithTag("amount").performSemanticsAction(SemanticsActions.SetProgress) { it(movable - 1f) }
+        onNodeWithTag("confirm-move").performClick()
         waitForIdle()
         assertEquals(1, state.movable(source))
         assertEquals(start.seed, state.seed)

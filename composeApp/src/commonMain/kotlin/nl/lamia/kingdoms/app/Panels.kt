@@ -1,6 +1,7 @@
 package nl.lamia.kingdoms.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -18,10 +19,20 @@ fun Modifier.panel() = background(Palette.Parchment.copy(alpha = 0.92f), Rounded
     .padding(horizontal = 10.dp, vertical = 6.dp)
 
 @Composable
-fun Chip(text: String, active: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+fun Chip(text: String, active: Boolean = false, enabled: Boolean = true, small: Boolean = false, onClick: () -> Unit) {
     val style = Label.copy(
+        fontSize = if (small) 12.sp else 14.sp,
         fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
         color = if (enabled) Palette.Ink else Palette.Ink.copy(alpha = 0.35f),
     )
-    BasicText(text, style = style, modifier = Modifier.panel().clickable(enabled = enabled, onClick = onClick))
+    val shape = RoundedCornerShape(7.dp)
+    BasicText(
+        text,
+        style = style,
+        modifier = Modifier
+            .background(if (active) Palette.Selected else Palette.Selected.copy(alpha = 0.7f), shape)
+            .border(if (active) 1.5.dp else 1.dp, Palette.Ink.copy(alpha = if (active) 0.7f else 0.25f), shape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = if (small) 7.dp else 10.dp, vertical = if (small) 3.dp else 5.dp),
+    )
 }
