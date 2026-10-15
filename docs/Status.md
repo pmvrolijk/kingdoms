@@ -5,17 +5,17 @@ session. Keep it short — it earns its value by being short.
 
 ## 1. Where things stand
 
-- **Phase:** M5 UI done (pending the user's look). Next is M6 (platforms and polish). Branch
-  `master`.
+- **Phase:** M5 UI done; the user has looked and three screen fixes followed (1h). Next is M6
+  (platforms and polish). Branch `master`; everything through session 1h is in commit 558cf59.
 - **Modules:** `core`, `composeApp`, `androidApp`, `iosApp` (Design §2.1). `core.map` generates
   the map (Design §3); `core.rules` is setup, moves, fatigue, battle, growth, elimination
-  (Design §4); `core.ai` has `HeuristicAi` with three personalities, `Simulation`, `PassiveAi`. The app plays a game: owner
-  bands, army badges with yield, capital rings, movable dots, dashed targets with win chances,
-  long-press amount picker, turn bar with per-kingdom totals, event log, victory/defeat panel,
-  debug buttons (map seed/size, kingdom count 2–6, turn order, restart). AI turns play step by
-  step with an arrow for the latest move and a Skip button. Amount picker by long-press or
-  right-click on the target. 55 core tests; composeApp has 4 snapshot tests, 3 UI play tests and
-  2 picker tests (Compose ui-test, virtual clock, ~30 s).
+  (Design §4); `core.ai` has `HeuristicAi` with three personalities and three difficulties,
+  `Simulation`, `PassiveAi`. The app opens on the new-game screen (map, seed, turn order, seats
+  with name, colour, You/Easy/Normal/Hard, live preview), then plays: HUD (strength bars, turn
+  panel, chronicle, menu), province card, slider picker, banners and resource icons that scale at
+  half the zoom, province names when zoomed in, clash animation, result panel. 62 core tests (60
+  common, plus JVM-only `ManySeedsTest` over 9000 maps and `TuningReport`); composeApp has 9
+  snapshot tests, 3 UI play tests and 2 picker tests (~2 min).
 - **M1 verified:** 14 property tests over 34 maps (10 seeds × 3 presets, plus 6, 120, no-sea and
   70%-sea/all-features) pass on JVM, Android host and iOS simulator: exact province count,
   connected land, symmetric neighbours, shared border paths identical in both outlines, cells
@@ -107,7 +107,11 @@ Latest first. Keep the last three sessions; condense older ones to a line under 
 - User: "the last arrow of the enemy moves stays visible when it is the players turn". It was
   cleared only when the player moved; now an AI's end of turn clears it.
   `noEnemyArrowOnThePlayersTurn` compares the screen with a fresh render of the same state.
-- **Picking this up:** the user looks at the new-game screen; then M6.
+- Not checked: pinch-zoom and the scaled markers/names on a real device; the leftover arrow was
+  reproduced only headless (a test), not in the user's window after the fix.
+- **Picking this up:** M6 — start with autosave/resume (the `onChange` hook is there), then
+  device touch tuning. Optional, not asked for: a leader-focus for Normal AI against the
+  far-kingdom effect.
 
 ### 2026-10-15 — Session 1g: M5 HUD
 
