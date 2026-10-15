@@ -1,20 +1,54 @@
 package nl.lamia.kingdoms.app
 
 import androidx.compose.ui.graphics.Color
-import nl.lamia.kingdoms.core.map.Feature
+import androidx.compose.ui.graphics.lerp
 import nl.lamia.kingdoms.core.map.Terrain
 
-/** Flat M1 colours; the cel-shaded style replaces these in M4. */
+/** Cozy cel-shaded palette (Design §8): flat fills, darker same-hue outlines, never black. */
 object Palette {
     val Parchment = Color(0xFFF4E9D2)
     val Ink = Color(0xFF5B4632)
-    val Sea = Color(0xFF8EC9D9)
-    val DeepSea = Color(0xFF6FAFC4)
-    val Shore = Color(0xFF4F7F8C)
-    val Border = Color(0x805B4632)
     val Selected = Color(0xFFFFF8E7)
-    val Neighbour = Color(0x40FFF8E7)
-    val Neutral = Color(0xFFD8D0C0)
+    val Neutral = Color(0xFFE6DCC8)
+
+    val Sea = Color(0xFF8ECFD9)
+    val SeaDeep = Color(0xFF7CC2CF)
+    val Wave = Color(0xFFC4ECF0)
+    val Foam = Color(0xFFF4FBFA)
+    val BoardShadow = Color(0x33285A6A)
+    val Earth = Color(0xFFB08860)
+    val EarthDark = Color(0xFF8A6744)
+
+    val River = Color(0xFF6DB3DC)
+    val RiverLight = Color(0xFFA6DBF0)
+    val Pool = Color(0xFF8FD0DC)
+    val PoolRim = Color(0xFFD4F1F4)
+
+    val TreeDark = Color(0xFF4E9457)
+    val TreeLight = Color(0xFF72B567)
+    val TreeOutline = Color(0xFF2F6A3B)
+    val Trunk = Color(0xFF8A6744)
+    val HillBase = Color(0xFF9DC271)
+    val HillLight = Color(0xFFBFD98F)
+    val HillOutline = Color(0xFF6A8C47)
+    val RockLight = Color(0xFFBCB2A6)
+    val RockDark = Color(0xFF928679)
+    val RockOutline = Color(0xFF5E544C)
+    val Snow = Color(0xFFF8F6F1)
+    val SnowShade = Color(0xFFDCE3EA)
+    val Reed = Color(0xFF6F8C4C)
+    val Cattail = Color(0xFF8A5F3C)
+    val Field = Color(0xFFE8D58C)
+    val FieldStripe = Color(0xFFCDB869)
+    val FieldOutline = Color(0xFFA8955A)
+
+    fun terrain(t: Terrain) = when (t) {
+        Terrain.Plains -> Color(0xFFD5E28E)
+        Terrain.Hills -> Color(0xFFB7D38A)
+        Terrain.Forest -> Color(0xFF9CC77E)
+        Terrain.Mountains -> Color(0xFFCFC5AF)
+        Terrain.Marsh -> Color(0xFFAAC6A2)
+    }
 
     private val kingdoms = listOf(
         Color(0xFF4A7BD0), // blue
@@ -26,28 +60,9 @@ object Palette {
     )
 
     fun kingdom(id: Int) = kingdoms[id % kingdoms.size]
-
-    fun terrain(t: Terrain) = when (t) {
-        Terrain.Plains -> Color(0xFFC9DE8A)
-        Terrain.Hills -> Color(0xFFA9C77A)
-        Terrain.Forest -> Color(0xFF6FA463)
-        Terrain.Mountains -> Color(0xFFA79C8E)
-        Terrain.Marsh -> Color(0xFF8FA88A)
-    }
-
-    fun feature(f: Feature) = when (f) {
-        Feature.River -> Color(0xFF4E9AC7)
-        Feature.Ridge -> Color(0xFF8B6B4A)
-        Feature.Marsh -> Color(0xFF5E7348)
-        Feature.Lake -> Color(0xFF7DC3E0)
-        Feature.MountainRange -> Color(0xFF6E6259)
-    }
-
-    /** Stroke width of a feature in screen pixels. */
-    fun featureWidth(f: Feature) = when (f) {
-        Feature.River -> 4f
-        Feature.Ridge, Feature.Marsh -> 5f
-        Feature.Lake -> 9f
-        Feature.MountainRange -> 7f
-    }
 }
+
+/** The same hue, darker: cel outlines and shade bands. */
+fun Color.darker(amount: Float = 0.3f) = lerp(this, Color(0xFF2A2420), amount)
+
+fun Color.lighter(amount: Float = 0.3f) = lerp(this, Color.White, amount)

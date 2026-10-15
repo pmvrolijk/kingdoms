@@ -37,7 +37,7 @@ fun App(onGameChange: (GameState) -> Unit = {}) {
         NewGame.create(map, kingdoms, seed = config.seed + restarts, turnOrder = turnOrder)
     }
 
-    Box(Modifier.fillMaxSize().background(Palette.DeepSea)) {
+    Box(Modifier.fillMaxSize().background(Palette.SeaDeep)) {
         GameScreen(
             game,
             onNewGame = { config = config.copy(seed = Random.nextLong(1, 1_000_000)) },

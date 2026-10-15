@@ -38,6 +38,21 @@ class NewGameTest {
     }
 
     @Test
+    fun theFirstMoverInAHeadToHeadGetsTheBonus() {
+        val map = Fixtures.map
+        for (order in TurnOrder.entries) {
+            val game = NewGame.create(map, kingdoms = 2, seed = 4, turnOrder = order)
+            val growth = game.kingdoms.map { game.growthOf(it.id) }
+            val bonus = if (order == TurnOrder.Rotating) 0 else NewGame.HEAD_TO_HEAD_BONUS
+            for (k in game.kingdoms) {
+                val expected = NewGame.CAPITAL_ARMIES + (growth.max() - growth[k.id]) * NewGame.COMPENSATION +
+                    if (k.id == 0) bonus else 0
+                assertEquals(expected, game.holdings[k.capital].armies, "$order kingdom ${k.id}")
+            }
+        }
+    }
+
+    @Test
     fun startsAreNearlyEven() = games.forEach { game ->
         val growth = game.kingdoms.map { game.growthOf(it.id) }
         assertTrue(growth.max() - growth.min() <= 3, "growth $growth, seed ${game.seed}")

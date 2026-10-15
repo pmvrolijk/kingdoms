@@ -5,7 +5,7 @@ session. Keep it short — it earns its value by being short.
 
 ## 1. Where things stand
 
-- **Phase:** M3 AI done. Next is M4 (look). Branch `master`.
+- **Phase:** M4 look done (first pass). Next is M5 (UI). Branch `master`.
 - **Modules:** `core`, `composeApp`, `androidApp`, `iosApp` (Design §2.1). `core.map` generates
   the map (Design §3); `core.rules` is setup, moves, fatigue, battle, growth, elimination
   (Design §4); `core.ai` has `HeuristicAi` with three personalities, `Simulation`, `PassiveAi`. The app plays a game: owner
@@ -53,9 +53,7 @@ session. Keep it short — it earns its value by being short.
   screen). Compose 1.12 restarts `pointerInput` when its lambda changes, so stale tap handlers are
   ruled out. If it recurs: note the turn bar text, whether selection/targets showed, any log line,
   and the terminal output.
-- **Design §11 #1 — second-mover edge in two-kingdom games** (57–65% for the second mover since
-  the user asked for alternation when two remain). Proposed: extra starting armies for the
-  first mover. Doesn't block M4.
+- None. Design §11 is empty.
 
 ## 3. To do next
 
@@ -68,16 +66,36 @@ In order; each milestone ends with something runnable on desktop.
       chains — fine for rules, revisit in M4 for looks.
 - [x] **M2 Rules.** Playable against passive kingdoms on desktop.
 - [x] **M3 AI.** Heuristic AI, simulation, fair setup, paced AI turns, Shuffled order.
-- [ ] **M4 Look.** The 2.5D cel-shaded style (Design §8): board edge, props, banners, water,
-      cached static layer.
-- [ ] **M5 Platforms and polish.** Touch input on Android/iOS, title/result screens, autosave
-      and resume (the `onChange` hook is there). HUD layout: at 1024×768 the bottom-left panels
-      cover the player's own provinces — the kingdom list and log need to move or collapse, and
-      the camera fit should leave room for the HUD.
+- [x] **M4 Look.** Board space with tilt, earth slab, cel props, animated water, banners and
+      towers, layered canvases. First pass — expect tweaks from play.
+- [ ] **M5 UI.** The HUD and screens: compact HUD that keeps clear of the map (kingdom list and
+      log collapsible), camera fit that leaves room for it, phone portrait and landscape layouts
+      (on a phone the map is tiny and screen-sized banners crowd it — scale them with zoom
+      below some size), the debug bar replaced by a new-game screen (map size, kingdoms, seed,
+      turn order), title and result screens.
+- [ ] **M6 Platforms and polish.** Touch tuning on Android/iOS devices, autosave and resume
+      (the `onChange` hook is there), real-device performance (the headless emulator renders in
+      software, so its frame times say nothing), app icons, the iOS ICU deployment warning.
 
 ## 4. Handover
 
 Latest first. Keep the last three sessions; condense older ones to a line under "Earlier".
+
+### 2026-10-15 — Session 1f: M4 look
+
+- `Board` (board space, tilt, wall), `BoardGeometry` (paths, walls, rivers, decals and props
+  placed once per map), `Props.kt` (cel-shaded tree, hill, mountain, reeds, tuft, pool, field),
+  `MapView` rebuilt as three layered canvases; `Palette` reworked with `darker`/`lighter`.
+- Iterated on snapshots: second pass thickened outlines, added a selection glow, made fields
+  rounded farmland, thinned mountain provinces, gave capitals a tower with a coloured roof.
+- Found by counting draw calls, not by looking: sibling canvases share a layer, so the animated
+  water re-ran the land's draw every frame. Fixed with a `graphicsLayer` per canvas (150 → 1 land
+  draws per 150 frames). The headless emulator's frame times (~1 s, software GPU) are not a
+  measure of anything; real-device numbers belong to M6.
+- Runs on desktop, Android emulator and iOS simulator. On a phone in portrait the map is tiny
+  and banners crowd it — the user's next ask is the UI, now M5.
+- **Picking this up:** M5 UI. Ask the user what the HUD and screens should feel like before
+  building (layout on phone vs desktop, what must always be visible).
 
 ### 2026-10-15 — Session 1e: M3 AI
 
@@ -103,45 +121,14 @@ Latest first. Keep the last three sessions; condense older ones to a line under 
 - User asked for alternation once two kingdoms remain (no double turns head to head). Done,
   with a test. Side effect measured and written up as Design §11 #1; own-turn growth as a fix
   was measured and rejected (78–83% for the first mover).
-- **Picking this up:** answer Design §11 #1, then M4 — the 2.5D cel-shaded look (Design §8).
-  Use the snapshot tests to see the result; consider the HUD-covers-map issue (M5 note)
-  while restyling panels.
-
-### 2026-10-15 — Session 1d: M2 rules
-
-- `core.rules`: `GameState`/`Holding`/`Kingdom`, `Action`/`Event`/`Outcome`/`Rejection`,
-  `Rules.apply`, `Battle` (resolve + exact `winChance` via piecewise-linear integral), `NewGame`.
-  `core.ai`: `Ai`, `PassiveAi`, `playUntilHumanTurn` (ends an AI's turn if it submits a rejected
-  action, so a buggy AI cannot hang the game).
-- App rebuilt around `GameScreen`; `MapView` draws ownership and badges in screen space so they
-  stay readable at any zoom. `SnapshotTest` now also taps through a move headlessly — the way to
-  check UI interaction from the terminal.
-- Choices made without the user: exactly two starting neighbours (design said 1–2); round-robin
-  claiming; kingdom 0 is human; game seed = map seed + restarts; names Aldmere, Brightvale,
-  Corrindor, Dunmoor, Eastwatch, Fernholt; kingdom colours blue/red/gold/purple/teal/orange.
-- **Picking this up:** play a game by hand on desktop (picker, End turn, finish), then M3: promote
-  the greedy policy into a real AI, simulate AI-vs-AI for game length and fairness.
-
-### 2026-10-15 — Session 1c: M1 map
-
-- Built `core.map`: `MapGenerator`, `Voronoi` (half-plane clipping), `NoisyEdges`, `ValueNoise`,
-  `GameMap`/`Province`/`Border`/`Shore`. Swapped the planned Poisson-disc + Bowyer–Watson + noise
-  threshold for best-candidate sampling, bisector clipping and grow-from-centre land: exact
-  counts, connected by construction, far less code. Design §3.1 updated to match.
-- Border wobble is bounded geometrically (quad inside the two cells' fan triangles), so "borders
-  never cross" is a property of the construction, and the tests confirm it.
-- Added `SnapshotTest` (composeApp jvmTest): renders `App()` headless to
-  `composeApp/build/snapshots/app.png`. Use it for visual checks; the terminal cannot screenshot
-  the desktop window.
-- Coast as a terrain crowded out Plains (0–5%, avg yield ≈1.0). User decided: coastal is a
-  province attribute, +1 yield and Fish. Measured after (50 seeds/size): Plains 35–39%, yields
-  1/2/3 split roughly in thirds, average ≈2.0 per province per round. That is double the rate
-  the first design assumed — the thing to watch in M3 game-length tuning.
-- **Picking this up:** try pan/zoom/tap by hand on desktop, then start M2 with `GameState`,
-  `Action` and `apply`.
+- User chose the first-mover bonus; swept 0–12, then 1 and 2 over 400 games: 2 kept
+  (Design §4.1 has the numbers; Small maps stay slightly short).
+- **Picking this up:** M4.
 
 ### Earlier
 
+- **Session 1d (M2):** `core.rules` (GameState, Rules.apply, Battle with exact win chance,
+  NewGame); app rebuilt around `GameScreen`; headless tap-through snapshot tests.
 - **Session 1b (M0):** hand-built KMP scaffold (no wizard); Compose 1.12 needs compileSdk 37;
   Xcode 26.3 needs the iOS 26.2 platform even for simulator builds; hand-written pbxproj worked.
 - **Session 1 (setup):** working method, first design; user decided home-grown armies, fatigue,

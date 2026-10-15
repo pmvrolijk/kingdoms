@@ -20,6 +20,16 @@ object NewGame {
     /** A poorer start gets this many rounds of its growth shortfall as extra capital armies. */
     const val COMPENSATION = 3
 
+    /**
+     * Extra capital armies for the first mover when two kingdoms alternate from the start: the
+     * second mover always acts just before growth, which is worth this much (Design §4.1).
+     * Tuned by simulation: 2 brings the first mover's win rate from 35–42% to 46–51%.
+     */
+    const val HEAD_TO_HEAD_BONUS = 2
+
+    /** Two kingdoms under Fixed or Shuffled order alternate every round (Design §4.2). */
+    fun headToHeadAlternates(kingdoms: Int, turnOrder: TurnOrder) = kingdoms == 2 && turnOrder != TurnOrder.Rotating
+
     val NAMES = listOf("Aldmere", "Brightvale", "Corrindor", "Dunmoor", "Eastwatch", "Fernholt")
 
     private const val SETUP = 100L
@@ -58,7 +68,8 @@ object NewGame {
         val compensated = holdings.mapIndexed { p, h ->
             val k = h.owner
             if (k != null && p == capitals[k]) {
-                val extra = (growth.max() - growth[k]) * COMPENSATION
+                val headToHead = if (k == 0 && headToHeadAlternates(kingdoms, turnOrder)) HEAD_TO_HEAD_BONUS else 0
+                val extra = (growth.max() - growth[k]) * COMPENSATION + headToHead
                 h.copy(armies = h.armies + extra, fresh = if (h.fresh > 0) h.fresh + extra else 0)
             } else {
                 h

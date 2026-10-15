@@ -174,6 +174,10 @@ count matches.
 - Territories are dealt to seats at random, so turn order says nothing about map position.
 - Each owned province starts with 2 armies, the capital with 5. A kingdom whose starting growth
   is below the best gets **3 rounds of its shortfall** as extra capital armies.
+- **Head-to-head bonus:** in a two-kingdom game that alternates (Fixed or Shuffled order), the
+  first mover gets **2** extra capital armies — the second mover always acts just before growth.
+  Measured (200–400 games per size): first mover 35–42% without, Medium 50–53% and Large 47–50%
+  with; Small stays a little short at 41–46% (3 overshoots to 54%).
 - Remaining provinces are **neutral** with 1–3 armies. Neutral provinces do not grow.
 
 ### 4.2 Round and turn
@@ -296,21 +300,32 @@ The game autosaves at the end of every turn: seed + settings + action log, or a 
 
 Cozy, cartoony, cel-shaded — a painted tabletop diorama seen from above at a slight angle.
 
-- **Projection.** Orthographic top-down with a tilt: ground-plane `y` is scaled by ≈0.8 and
-  elevation is drawn as a vertical offset upward. Objects are painted back-to-front by `y`.
-- **Land as a board.** The landmass has a visible side face (darker earth band) along the coast,
-  so the map reads as a thick tile resting on water.
-- **Cel shading.** Flat fills with 2–3 hard-edged tone bands, no gradients. Outlines are thick and
-  a darker shade of the fill colour, never pure black.
-- **Kingdom colours.** Warm pastel palette; ownership shown as a tinted border band inside the
-  province outline plus banner colour, so terrain colour stays readable.
-- **Props.** Vector-drawn, chunky and rounded: tree clusters, round hills, mountains with snow
-  caps, reeds and pools for marsh, lakes with a light rim, gentle animated waves along coasts.
-  Border features (§3.4) are props placed along the border polyline.
-- **Armies.** A small banner/figure in kingdom colour with a count badge, standing on the
-  province's site, which the generator guarantees lies inside the outline.
-- **Performance.** Static layers (terrain, borders, props) are rendered once to an `ImageBitmap`
-  and redrawn only when ownership changes; armies, selection and water animate on top.
+- **Board space.** The ground plane is drawn with `y × 0.8` (`Board.TILT`); heights go straight
+  up in board units, so props stay upright and are painted back to front by their base `y`. The
+  camera maps board space to the screen; taps map back exactly, so hit-testing is unchanged.
+- **Land as a board.** The island is a slab `Board.WALL` (14) units thick: every coast segment is
+  swept downward into an earth wall in two tones, with a soft drop shadow on the water and foam
+  along the coast and the wall foot.
+- **Cel shading.** Flat fills, one hard-edged light band on the lit (upper-left) side, outlines in
+  a darker shade of the fill (`Color.darker`), never black, never gradients. Outlines scale with
+  the board but never drop below ~1 px.
+- **Kingdom colours.** Ownership is a light tint plus a coloured band inside the province
+  outline, so the terrain stays readable; banners and towers carry the full colour.
+- **Props.** Placed once per map (same map, same props), clear of each province's edges and of
+  its banner: tree clusters (forest), rounded hills, snow-capped two-tone mountains, reeds and
+  pools (marsh), rounded crop fields and grass tufts (plains). Border features are drawn on the
+  border: rivers as ribbons, lakes as ovals at the border's middle, ridges as hills, mountain
+  ranges as peaks, marsh as reeds and pools along the line.
+- **Water.** Sea-coloured background with drifting wave marks and pulsing foam.
+- **Armies.** On each site, a count plate in the owner's colour (neutral: parchment) with the
+  yield under it, a white dot while armies can still move, a pennant on a pole for owned
+  provinces, and a small tower with a roof in the kingdom's colour under the pennant for a
+  capital. These are screen-sized so they read at any zoom.
+- **Performance.** Three stacked canvases: water (the only one reading the animation clock),
+  land (walls, terrain, ownership, borders, props — redrawn only on camera or ownership change),
+  overlay (selection, targets, arrows, banners). Each has its own `graphicsLayer`; without it the
+  water's per-frame invalidation re-runs the land's draw every frame (measured: 150 land draws in
+  150 frames without, 1 with).
 
 ## 9. Tuning targets
 
@@ -333,14 +348,11 @@ Guidelines, not rules — the game itself has no round or time limit.
 
 ## 11. Open questions
 
-1. **Second-mover edge in two-kingdom games.** Alternation makes a game that *starts* with two
-   kingdoms a fixed order, and the kingdom moving second always acts just before growth: it wins
-   57–65% (Small 65%, Medium/Large 57%; 200 games each). Seat 0 — the human — moves first.
-   Endgames of 4- and 6-kingdom games are unaffected (seats 22–28%). Growing on each kingdom's
-   own turn while two are left was measured and is much worse (first mover 78–83%).
-   *Options:* accept it; give the first mover in a two-kingdom game extra starting armies
-   (tunable, like compensation); or keep shuffling while both kingdoms are still at their
-   starting size. *Proposed:* extra starting armies for the first mover, tuned by simulation.
+None open.
+
+Decided 2026-10-15, head to head: with two kingdoms left, Shuffled order alternates (no double
+turns); a two-kingdom game gives the first mover a 2-army bonus (§4.1). Own-turn growth was
+measured as the alternative and rejected (first mover 78–83%).
 
 Decided 2026-10-15, turn order: **Shuffled** by default. Simulation (300 games per line, all AI)
 showed Fixed order letting the first seat — the human — win only 8–14% of 4-kingdom games and the
