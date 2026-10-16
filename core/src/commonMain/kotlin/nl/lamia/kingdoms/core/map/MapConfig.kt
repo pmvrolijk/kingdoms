@@ -1,5 +1,7 @@
 package nl.lamia.kingdoms.core.map
 
+import kotlinx.serialization.Serializable
+
 /** Player-facing map size presets (Design §3.5), sized for 4 kingdoms. */
 enum class MapSize(val landProvinces: Int) {
     Small(18),
@@ -8,6 +10,7 @@ enum class MapSize(val landProvinces: Int) {
 }
 
 /** Everything the map generator needs; map size is never a constant (Design §3.5). */
+@Serializable
 data class MapConfig(
     val seed: Long,
     val landProvinces: Int = MapSize.Medium.landProvinces,

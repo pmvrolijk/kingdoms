@@ -30,15 +30,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.serialization.Serializable
 import nl.lamia.kingdoms.core.map.MapConfig
 import nl.lamia.kingdoms.core.map.MapGenerator
 import nl.lamia.kingdoms.core.map.MapSize
 import nl.lamia.kingdoms.core.rules.Difficulty
+import nl.lamia.kingdoms.core.rules.GameState
 import nl.lamia.kingdoms.core.rules.NewGame
 import nl.lamia.kingdoms.core.rules.TurnOrder
 import kotlin.random.Random
 
 /** Everything a new game is made from (Design §6.2). The first seat is the player. */
+@Serializable
 data class Setup(
     val landProvinces: Int = MapSize.Medium.landProvinces,
     val seed: Long = 1,
@@ -55,10 +58,17 @@ data class Setup(
 
 /**
  * Title and new-game screen: settings on the left, a live preview of the map with everyone's
- * starting territory on the right.
+ * starting territory on the right. With a saved game, [resume], Continue sits above Start.
  */
 @Composable
-fun NewGameScreen(setup: Setup, onChange: (Setup) -> Unit, onStart: () -> Unit, modifier: Modifier = Modifier) {
+fun NewGameScreen(
+    setup: Setup,
+    onChange: (Setup) -> Unit,
+    onStart: () -> Unit,
+    modifier: Modifier = Modifier,
+    resume: GameState? = null,
+    onContinue: () -> Unit = {},
+) {
     val map = remember(setup.config) { MapGenerator.generate(setup.config) }
     val preview = remember(map, setup.seats, setup.turnOrder) {
         if (setup.fits) NewGame.create(map, setup.seats, setup.seed, setup.turnOrder) else null
@@ -67,7 +77,8 @@ fun NewGameScreen(setup: Setup, onChange: (Setup) -> Unit, onStart: () -> Unit, 
 
     Row(modifier.background(Palette.Sea)) {
         // Settings scroll; Start stays pinned under them, so it is always on screen (phones).
-        Column(Modifier.width(380.dp).safeDrawingPadding().padding(12.dp).panel()) {
+        // The insets go outside the width: a camera cutout must not narrow the panel.
+        Column(Modifier.safeDrawingPadding().padding(12.dp).width(356.dp).panel()) {
           Column(
             Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -137,7 +148,21 @@ fun NewGameScreen(setup: Setup, onChange: (Setup) -> Unit, onStart: () -> Unit, 
             }
           }
           Spacer(Modifier.height(10.dp))
-          ActionButton("Start", Palette.kingdom(setup.seats.first().colour), enabled = setup.fits, onClick = onStart)
+          if (resume != null) {
+              // Side by side: on a landscape phone a second row of buttons hides the kingdoms.
+              val you = resume.kingdoms.firstOrNull { it.human }
+              Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                  ActionButton(
+                      "Continue · round ${resume.round}",
+                      you?.let { resume.colourOf(it.id) } ?: Palette.Ink,
+                      modifier = Modifier.weight(1.4f),
+                      onClick = onContinue,
+                  )
+                  ActionButton("Start new", Palette.Ink.lighter(0.3f), enabled = setup.fits, modifier = Modifier.weight(1f), onClick = onStart)
+              }
+          } else {
+              ActionButton("Start", Palette.kingdom(setup.seats.first().colour), enabled = setup.fits, onClick = onStart)
+          }
         }
 
         Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -184,7 +209,9 @@ private fun SeatRow(seat: NewGame.Seat, canRemove: Boolean, onChange: (NewGame.S
             singleLine = true,
             textStyle = Label.copy(fontWeight = FontWeight.Bold),
             cursorBrush = SolidColor(Palette.Ink),
-            modifier = Modifier.width(110.dp).background(Palette.Selected, RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 3.dp),
+            // The name gives way when the row is tight, so the difficulty chips never wrap.
+            modifier = Modifier.weight(1f, fill = false).width(110.dp)
+                .background(Palette.Selected, RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 3.dp),
         )
         if (seat.human) {
             BasicText("You", style = Small.copy(fontWeight = FontWeight.Bold), modifier = Modifier.padding(horizontal = 6.dp))
@@ -193,7 +220,6 @@ private fun SeatRow(seat: NewGame.Seat, canRemove: Boolean, onChange: (NewGame.S
                 Chip(d.name, active = d == seat.difficulty, small = true) { onChange(seat.copy(difficulty = d)) }
             }
         }
-        Spacer(Modifier.weight(1f))
         if (canRemove) BasicText("×", style = Label.copy(fontSize = 18.sp), modifier = Modifier.clickable(onClick = onRemove).padding(4.dp))
     }
 }

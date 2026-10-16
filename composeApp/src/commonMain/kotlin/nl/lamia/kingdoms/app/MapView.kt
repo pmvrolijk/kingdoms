@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
@@ -36,6 +37,8 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -54,6 +57,7 @@ import nl.lamia.kingdoms.core.map.Resource
 import nl.lamia.kingdoms.core.map.Point
 import nl.lamia.kingdoms.core.rules.GameState
 import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
@@ -72,6 +76,18 @@ class CameraState {
     var camera by mutableStateOf<Camera?>(null)
 }
 
+/** What the gesture handlers learn about the touch in progress; not state, nothing draws from it. */
+private class Touch {
+    /** The pointer that pressed last: a finger gets a tap tolerance, a mouse does not. */
+    var type = PointerType.Mouse
+
+    /** More than one finger has been down since the first one pressed: a pinch, never a tap. */
+    var multi = false
+}
+
+/** How far around a fingertip a tap that misses the land still finds a province (a coast, a small province). */
+private val TOUCH_SLACK = 12.dp
+
 /** Screen = board × scale + offset; board space is the tilted ground plane (see [Board]). */
 data class Camera(val offset: Offset, val scale: Float) {
     fun toWorld(screen: Offset) = Board.toWorld((screen - offset) / scale)
@@ -80,21 +96,32 @@ data class Camera(val offset: Offset, val scale: Float) {
 
     fun boardToScreen(board: Offset) = board * scale + offset
 
-    fun zoom(factor: Float, focus: Offset): Camera {
-        val newScale = (scale * factor).coerceIn(MIN_SCALE, MAX_SCALE)
+    /** Zooms by [factor] about [focus], within [MIN_ZOOM]..[MAX_ZOOM] of the [fitted] scale. */
+    fun zoom(factor: Float, focus: Offset, fitted: Float): Camera {
+        val newScale = (scale * factor).coerceIn(fitted * MIN_ZOOM, fitted * MAX_ZOOM)
         val applied = newScale / scale
         return Camera(focus - (focus - offset) * applied, newScale)
     }
 
+    /** Keeps the middle of the [view] over the board, so the map cannot be pushed off screen. */
+    fun keepOnBoard(map: GameMap, view: IntSize): Camera {
+        val board = boardSize(map)
+        val cx = view.width / 2f
+        val cy = view.height / 2f
+        return copy(offset = Offset(offset.x.coerceIn(cx - board.width * scale, cx), offset.y.coerceIn(cy - board.height * scale, cy)))
+    }
+
     companion object {
-        const val MIN_SCALE = 0.1f
-        const val MAX_SCALE = 8f
+        /** Zoom limits, relative to the fitted view: the same on a dense phone screen as on a desktop. */
+        const val MIN_ZOOM = 0.8f
+        const val MAX_ZOOM = 6f
+
+        private fun boardSize(map: GameMap) = Size(map.width.toFloat(), map.height.toFloat() * Board.TILT + Board.WALL)
 
         fun fit(map: GameMap, size: IntSize): Camera {
-            val width = map.width.toFloat()
-            val height = map.height.toFloat() * Board.TILT + Board.WALL
-            val scale = 0.95f * min(size.width / width, size.height / height)
-            return Camera(Offset((size.width - width * scale) / 2, (size.height - height * scale) / 2), scale)
+            val board = boardSize(map)
+            val scale = 0.95f * min(size.width / board.width, size.height / board.height)
+            return Camera(Offset((size.width - board.width * scale) / 2, (size.height - board.height * scale) / 2), scale)
         }
     }
 }
@@ -135,7 +162,27 @@ fun MapView(
     val text = rememberTextMeasurer()
     val waves by rememberInfiniteTransition().animateFloat(0f, 1f, infiniteRepeatable(tween(6_000, easing = LinearEasing)))
 
-    fun provinceAt(screen: Offset) = cameraState.camera?.let { map.provinceAt(it.toWorld(screen))?.id }
+    val touch = remember { Touch() }
+
+    /**
+     * The province under [screen]. A finger that just misses the land takes the province most of
+     * a ring of points [TOUCH_SLACK] around it lands on: fingertips are wide, coasts are thin.
+     */
+    fun PointerInputScope.provinceAt(screen: Offset): Int? {
+        val cam = cameraState.camera ?: return null
+        map.provinceAt(cam.toWorld(screen))?.let { return it.id }
+        if (touch.type != PointerType.Touch) return null
+        val r = TOUCH_SLACK.toPx()
+        return (0 until 8)
+            .mapNotNull { i -> map.provinceAt(cam.toWorld(screen + Offset(cos(i * PI / 4).toFloat() * r, sin(i * PI / 4).toFloat() * r)))?.id }
+            .groupingBy { it }.eachCount().maxByOrNull { it.value }?.key
+    }
+
+    /** Applies a camera change within the zoom limits, keeping the board on screen. */
+    fun PointerInputScope.moveCamera(change: (camera: Camera, fitted: Float) -> Camera) {
+        val cam = cameraState.camera ?: return
+        cameraState.camera = change(cam, Camera.fit(map, size).scale).keepOnBoard(map, size)
+    }
 
     val source = selected?.takeIf { game.isHumanTurn && game.movable(it) > 0 }
     val targets = source?.let { map.provinces[it].neighbours }.orEmpty()
@@ -149,7 +196,7 @@ fun MapView(
             .onSizeChanged { if (cameraState.camera == null && it != IntSize.Zero) cameraState.camera = Camera.fit(map, it) }
             .pointerInput(map) {
                 detectTransformGestures { centroid, pan, zoom, _ ->
-                    cameraState.camera = cameraState.camera?.let { Camera(it.offset + pan, it.scale).zoom(zoom, centroid) }
+                    moveCamera { cam, fitted -> Camera(cam.offset + pan, cam.scale).zoom(zoom, centroid, fitted) }
                 }
             }
             .pointerInput(map) {
@@ -158,9 +205,15 @@ fun MapView(
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                         val change = event.changes.first()
+                        val down = event.changes.count { it.pressed }
+                        if (event.type == PointerEventType.Press) {
+                            touch.type = change.type
+                            if (down == 1) touch.multi = false
+                        }
+                        if (down > 1) touch.multi = true
                         when {
                             event.type == PointerEventType.Scroll -> {
-                                cameraState.camera = cameraState.camera?.zoom(if (change.scrollDelta.y > 0) 1 / 1.1f else 1.1f, change.position)
+                                moveCamera { cam, fitted -> cam.zoom(if (change.scrollDelta.y > 0) 1 / 1.1f else 1.1f, change.position, fitted) }
                                 change.consume()
                             }
                             event.type == PointerEventType.Press && event.buttons.isSecondaryPressed -> {
@@ -172,8 +225,10 @@ fun MapView(
                 }
             }
             .pointerInput(map) {
-                val at = ::provinceAt
-                detectTapGestures(onTap = { currentOnTap(at(it)) }, onLongPress = { currentOnLongPress(at(it)) })
+                detectTapGestures(
+                    onTap = { if (!touch.multi) currentOnTap(provinceAt(it)) },
+                    onLongPress = { if (!touch.multi) currentOnLongPress(provinceAt(it)) },
+                )
             },
     ) {
         // Each layer has its own graphicsLayer: without it, the water's per-frame invalidation
@@ -361,9 +416,11 @@ private fun DrawScope.drawBanner(game: GameState, province: Int, site: Offset, t
     if (nameAlpha > 0f) {
         val name = text.measure(p.name, NameText.copy(fontSize = NameText.fontSize * scale))
         val at = Offset(site.x - name.size.width / 2f, y + icon + 1.5f * dp)
-        // A parchment halo keeps the name readable on any terrain.
+        // A parchment halo keeps the name readable on any terrain. The name must say Fill: on
+        // Android the layout's paint keeps the halo's Stroke otherwise (null means "unchanged"),
+        // and the name draws as a thick ink outline over its halo.
         drawText(name, color = Palette.Parchment, topLeft = at, alpha = nameAlpha * 0.85f, drawStyle = Stroke(3 * dp, join = StrokeJoin.Round))
-        drawText(name, topLeft = at, alpha = nameAlpha)
+        drawText(name, topLeft = at, alpha = nameAlpha, drawStyle = Fill)
     }
 }
 

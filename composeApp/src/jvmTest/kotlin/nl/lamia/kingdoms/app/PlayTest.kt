@@ -1,6 +1,10 @@
 package nl.lamia.kingdoms.app
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -19,6 +23,7 @@ import nl.lamia.kingdoms.core.rules.NewGame
 import nl.lamia.kingdoms.core.rules.TurnOrder
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -45,6 +50,35 @@ class PlayTest {
         onNodeWithText("Restart").performClick()
     }
 
+    /**
+     * Play two turns, close the app, open it again and Continue: the game on screen must be the
+     * saved one — a new game from the same setup has the same seed and map, so check the round.
+     */
+    @Test
+    fun continueResumesTheSavedGame() = runComposeUiTest {
+        val map = MapGenerator.generate(MapConfig.of(MapSize.Medium, seed = 1))
+        val store = MemorySaveStore()
+        var launch by mutableStateOf(0)
+        var state: GameState? = null
+        setContent { key(launch) { App(Setup(), store = store, onGameChange = { state = it }) } }
+        onNodeWithText("Start").performClick()
+        waitForIdle()
+        val expected = NewGame.create(map, kingdoms = 4, seed = 1, turnOrder = TurnOrder.Shuffled)
+        playTurns(map, expected, turns = 2) { state ?: expected }
+        val saved = assertNotNull(store.load(), "nothing saved")
+        assertEquals(state, saved.state, "the save holds the latest state")
+        assertTrue(saved.state.round >= 2, "round ${saved.state.round}")
+
+        launch++
+        state = null
+        waitForIdle()
+        onNodeWithText("Continue · round ${saved.state.round}").performClick()
+        waitForIdle()
+        playTurns(map, saved.state, turns = 1) { state ?: saved.state }
+        val resumed = assertNotNull(state, "no move after Continue")
+        assertTrue(resumed.round >= saved.state.round, "round ${resumed.round}: a new game, not the saved one")
+    }
+
     /** The full App from a known setup, after [setup] clicks; the start mirrors what App creates. */
     private fun playApp(order: TurnOrder, restarts: Int, playing: Boolean, setup: ComposeUiTest.() -> Unit) = runComposeUiTest {
         val map = MapGenerator.generate(MapConfig.of(MapSize.Medium, seed = 1))
@@ -67,10 +101,10 @@ class PlayTest {
      * Moves must land in the game on screen, [expected]: a stale handler would apply them to the
      * previous game, which has the same map and reports through the same hook — so check identity.
      */
-    private fun ComposeUiTest.playTurns(map: GameMap, expected: GameState, current: () -> GameState) {
+    private fun ComposeUiTest.playTurns(map: GameMap, expected: GameState, turns: Int = TURNS, current: () -> GameState) {
         val camera = Camera.fit(map, onRoot().fetchSemanticsNode().size)
 
-        repeat(TURNS) { turn ->
+        repeat(turns) { turn ->
             var state = current()
             // Wait (virtual time) for the AI to hand the turn back.
             var waited = 0

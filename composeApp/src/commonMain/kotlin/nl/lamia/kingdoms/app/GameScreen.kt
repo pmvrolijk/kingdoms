@@ -166,7 +166,7 @@ fun GameScreen(
         selected?.let { id ->
             val site = camera?.toScreen(game.map.provinces[id].site)
             val onLeft = site == null || site.x < constraints.maxWidth / 2
-            ProvinceCard(game, id, edge.align(if (onLeft) Alignment.BottomEnd else Alignment.BottomStart))
+            ProvinceCard(game, id, edge.align(if (onLeft) Alignment.BottomEnd else Alignment.BottomStart), compact = maxHeight < 480.dp)
         }
 
         pick?.let { current ->

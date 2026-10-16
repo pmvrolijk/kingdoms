@@ -1,11 +1,13 @@
 package nl.lamia.kingdoms.core.rules
 
+import kotlinx.serialization.Serializable
 import nl.lamia.kingdoms.core.map.GameMap
 
 /** How well an AI kingdom plays (Design §5). Ignored for human kingdoms. */
 enum class Difficulty { Easy, Normal, Hard }
 
 /** A kingdom. [colour] indexes the app's kingdom palette; it is the player's choice, not the id. */
+@Serializable
 data class Kingdom(
     val id: Int,
     val name: String,
@@ -28,12 +30,14 @@ enum class TurnOrder {
 }
 
 /** Who holds a province and with what. [owner] null is neutral; [fresh] armies may still move this turn. */
+@Serializable
 data class Holding(val owner: Int?, val armies: Int, val fresh: Int = 0)
 
 /**
  * The whole game, immutable. Change it only through [Rules.apply]. Randomness comes from [seed]
  * and the [draws] counter, so a state plus an action always produces the same next state.
  */
+@Serializable
 data class GameState(
     val map: GameMap,
     val seed: Long,

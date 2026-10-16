@@ -62,6 +62,8 @@ xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
 - **The UI's win-chance preview calls the battle code in `core`.** Never a separate estimate.
 - **A UI test must check that the state it observes belongs to the game on screen** (seed, turn
   order), not just that some state changed: a new game on the same map has the same layout.
+- **Text drawn after a stroked `drawText` passes `drawStyle = Fill`.** On Android the layout's
+  paint keeps the stroke otherwise; desktop snapshots do not show it.
 - **Every map layer `Canvas` keeps its own `graphicsLayer()`.** Without it, the animated water
   re-runs the land's draw (all props) every frame (Design §8).
 - **Re-run the tuning report after changing rules, setup or AI.** Unit tests do not catch a

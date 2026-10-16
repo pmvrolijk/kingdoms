@@ -29,10 +29,13 @@ fun Chip(text: String, active: Boolean = false, enabled: Boolean = true, small: 
     BasicText(
         text,
         style = style,
+        softWrap = false,
+        maxLines = 1,
         modifier = Modifier
             .background(if (active) Palette.Selected else Palette.Selected.copy(alpha = 0.7f), shape)
             .border(if (active) 1.5.dp else 1.dp, Palette.Ink.copy(alpha = if (active) 0.7f else 0.25f), shape)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = if (small) 7.dp else 10.dp, vertical = if (small) 3.dp else 5.dp),
+            // About 28 and 34 dp tall: a fingertip, without crowding a phone-height panel.
+            .padding(horizontal = if (small) 8.dp else 11.dp, vertical = if (small) 5.dp else 7.dp),
     )
 }

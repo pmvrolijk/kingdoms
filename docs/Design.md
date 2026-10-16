@@ -300,7 +300,9 @@ turns at once.
 ## 6. Screens and interaction
 
 Landscape only: phones are locked to landscape (Android `sensorLandscape`, iOS landscape
-orientations); desktop windows are landscape by default.
+orientations); desktop windows are landscape by default. Android runs full screen (system bars
+hidden, a swipe from the edge shows them for a moment): a landscape phone is only ~360 dp tall.
+The smallest screen checked is the Huawei P30, 780 × 360 dp (snapshots `*-p30.png`).
 
 ### 6.1 In game
 
@@ -329,6 +331,12 @@ The map fills the screen; the HUD sits in the corners on parchment panels.
   shrink to 60% when provinces get small on screen; zooming scales them half as much as the map.
   Zoomed in (a province over ~120 dp wide on screen), each province's name fades in under its
   banner.
+- **Touch.** Drag to pan, pinch to zoom; zoom stays within 0.8×–6× of the fitted view and the
+  middle of the screen stays over the board, so the map cannot be lost. A finger tap that misses
+  the land (a coast, a cliff, a thin province) takes the province most of a ring of points 12 dp
+  around it lands on; a mouse click does not. A touch with two fingers down is never a tap or
+  long-press. Chips are ~34 dp tall (small ~28 dp), buttons ~40 dp. Under 480 dp of height the
+  province card leaves out its how-to line.
 - **Game over** — a centred panel: victory or defeat, rounds played, New game.
 
 ### 6.2 New game, menu, result
@@ -338,15 +346,32 @@ The map fills the screen; the HUD sits in the corners on parchment panels.
   kingdoms: colour swatch (tap for the next unused colour), editable name, *You* or an AI
   difficulty, remove; Add a kingdom up to six; **Start** stays pinned at the bottom. On the right a
   live preview of the actual map with each kingdom's starting territory in its colour. Start is
-  disabled, with a reason, when the map is too small for the kingdoms.
+  disabled, with a reason, when the map is too small for the kingdoms. With a saved game,
+  **Continue · round N** (in the player's colour) sits beside Start, which then reads *Start
+  new*; starting one replaces the save.
 - **Menu** (in game): Resume, Restart (same setup, new game seed), New game….
 - **Result**: Victory / Defeat / "X wins" in the winner's colour, rounds played, Play again,
   New game….
 
 ## 7. Save and resume
 
-The game autosaves at the end of every turn: seed + settings + action log, or a serialized
-`GameState` snapshot (both are deterministic; the snapshot is simpler to load).
+One save slot. The app saves after every applied action — a phone can kill the app in the
+middle of the player's turn — and once when a game starts; a finished game clears the save.
+Decided 2026-10-16 (user): a **`GameState` snapshot**, not seed + action log, and a Continue
+button on the new-game screen rather than launching straight into the game.
+
+- **Format:** JSON via kotlinx.serialization (`core.rules.Save`): the whole `GameState`, map
+  included, so a save does not depend on the generator staying the same; defaults are written
+  out; unknown keys are ignored. The app wraps it as `SavedGame(setup, restarts, state)`, so
+  Restart after a resume gives the same next seed. Battles draw from the state's seed and
+  `draws` counter (§2.3), so a loaded game plays on exactly as it would have.
+- **Size:** 150 KB (Small) to 300 KB (Large); encoding under 1 ms, decoding ~3 ms on desktop.
+- **Where:** `save.json` — desktop `~/Library/Application Support/Kingdoms` (macOS) or
+  `$XDG_DATA_HOME/kingdoms` (Linux, default `~/.local/share`); Android the app's `filesDir`; iOS
+  Application Support. Written to `save.json.tmp` and renamed, so a crash mid-write keeps the old
+  save. A save that does not parse or fails validation is treated as no save; a failed write
+  loses the save but does not stop play.
+- Not saved: the chronicle, the last AI arrow, the camera, the selection.
 
 ## 8. Visual style
 

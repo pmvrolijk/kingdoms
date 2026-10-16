@@ -1,5 +1,6 @@
 package nl.lamia.kingdoms.core.rules
 
+import kotlinx.serialization.Serializable
 import nl.lamia.kingdoms.core.map.GameMap
 import nl.lamia.kingdoms.core.map.mix
 import kotlin.random.Random
@@ -35,6 +36,7 @@ object NewGame {
     private const val SETUP = 100L
 
     /** One kingdom to set up: who plays it and how it looks. [colour] indexes the app's palette. */
+    @Serializable
     data class Seat(val name: String, val colour: Int, val human: Boolean, val difficulty: Difficulty = Difficulty.Normal)
 
     /** Default seats: [kingdoms] kingdoms with the standard names and colours, [humans] played by people. */

@@ -1,6 +1,9 @@
 package nl.lamia.kingdoms.core.map
 
+import kotlinx.serialization.Serializable
+
 /** A land province. [outline] is a closed ring; [site] always lies inside it. */
+@Serializable
 data class Province(
     val id: Int,
     /** A generated place name, unique within the map. */
@@ -19,14 +22,17 @@ data class Province(
 }
 
 /** The shared border between land provinces [a] < [b]; both outlines contain [path] exactly. */
+@Serializable
 data class Border(val a: Int, val b: Int, val path: List<Point>, val feature: Feature?) {
     val defence: Double get() = feature?.defence ?: 1.0
 }
 
 /** A stretch of coastline: a land province's edge against sea. */
+@Serializable
 data class Shore(val province: Int, val path: List<Point>)
 
 /** The generated map. Provinces are numbered 0 until `provinces.size`. */
+@Serializable
 data class GameMap(
     val config: MapConfig,
     val width: Double,

@@ -37,9 +37,10 @@ fun GameState.split(province: Int): ArmySplit? {
 /**
  * The selected province as an infographic: terrain, owner, production as one resource icon per
  * army grown, armies with their can-move / stays / fatigued split, and defended borders.
+ * [compact] (a landscape phone, ~360 dp tall) leaves out the how-to line.
  */
 @Composable
-fun ProvinceCard(game: GameState, id: Int, modifier: Modifier = Modifier) {
+fun ProvinceCard(game: GameState, id: Int, modifier: Modifier = Modifier, compact: Boolean = false) {
     val p = game.map.provinces[id]
     val h = game.holdings[id]
     val owner = h.owner
@@ -103,9 +104,9 @@ fun ProvinceCard(game: GameState, id: Int, modifier: Modifier = Modifier) {
             }
         }
 
-        if (game.isHumanTurn && game.movable(id) > 0) {
+        if (!compact && game.isHumanTurn && game.movable(id) > 0) {
             BasicText(
-                "Click a neighbour to send ${game.movable(id)} · right-click or long-press it to choose",
+                "Pick a neighbour to send ${game.movable(id)} · long-press or right-click it to choose how many",
                 style = Small.copy(color = Palette.Ink.copy(alpha = 0.7f)),
             )
         }

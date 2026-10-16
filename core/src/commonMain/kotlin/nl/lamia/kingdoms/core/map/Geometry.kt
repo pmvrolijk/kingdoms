@@ -1,9 +1,11 @@
 package nl.lamia.kingdoms.core.map
 
+import kotlinx.serialization.Serializable
 import kotlin.math.abs
 import kotlin.math.sqrt
 
 /** A point in map units. A province is roughly 100 × 100 units (see [MapGenerator.CELL_AREA]). */
+@Serializable
 data class Point(val x: Double, val y: Double) {
     operator fun plus(o: Point) = Point(x + o.x, y + o.y)
     operator fun minus(o: Point) = Point(x - o.x, y - o.y)

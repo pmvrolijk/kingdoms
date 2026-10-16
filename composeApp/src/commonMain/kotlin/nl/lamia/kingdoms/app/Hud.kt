@@ -124,7 +124,7 @@ fun TurnPanel(game: GameState, onEndTurn: () -> Unit, onSkip: () -> Unit, onMenu
                         .border(if (current) 2.dp else 1.dp, if (current) Palette.Ink else Palette.Ink.copy(alpha = 0.4f), CircleShape),
                 )
             }
-            onMenu?.let { BasicText("Menu", style = Small, modifier = Modifier.padding(start = 4.dp).clickable(onClick = it)) }
+            onMenu?.let { Spacer(Modifier.width(2.dp)); Chip("Menu", small = true, onClick = it) }
         }
         val who = when {
             game.isOver -> "Game over"
@@ -177,7 +177,7 @@ fun ActionButton(text: String, colour: Color, enabled: Boolean = true, modifier:
             .background(fill, RoundedCornerShape(8.dp))
             .border(1.5.dp, fill.darker(0.4f), RoundedCornerShape(8.dp))
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 7.dp),
+            .padding(vertical = 10.dp),
     )
 }
 

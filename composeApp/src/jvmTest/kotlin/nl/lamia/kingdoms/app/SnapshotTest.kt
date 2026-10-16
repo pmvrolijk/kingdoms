@@ -51,6 +51,15 @@ class SnapshotTest {
             scene.render()
             scene.save("new-game-phone.png", frame = 1)
         }
+        // Huawei P30: 780 × 360 dp, the smallest phone we check.
+        ImageComposeScene(2340, 1080, density = Density(3f)) { App(Setup()) }.use { scene ->
+            scene.render()
+            scene.save("new-game-p30.png", frame = 1)
+        }
+        ImageComposeScene(2340, 1080, density = Density(3f)) { App(Setup(), playing = true) }.use { scene ->
+            scene.render()
+            scene.save("app-p30.png", frame = 1)
+        }
     }
 
     @Test
@@ -58,13 +67,13 @@ class SnapshotTest {
         ImageComposeScene(width, height) { App(Setup(), playing = true) }.use { scene ->
             scene.render()
             val at = Offset(640f, 400f)
-            // 1.1× per wheel notch: about 1.6×, then 2.6× (names fade in), then 0.5×.
+            // 1.1× per wheel notch: about 1.6×, then 2.6× (names fade in), then out to the limit (0.8×).
             for ((notches, name) in listOf(5 to "zoom-1.6.png", 5 to "zoom-2.6.png")) {
                 repeat(notches) { scene.sendPointerEvent(PointerEventType.Scroll, at, scrollDelta = Offset(0f, -1f)) }
                 scene.save(name, frame = 1)
             }
             repeat(17) { scene.sendPointerEvent(PointerEventType.Scroll, at, scrollDelta = Offset(0f, 1f)) }
-            scene.save("zoom-0.5.png", frame = 1)
+            scene.save("zoom-out.png", frame = 1)
         }
         ImageComposeScene(2556, 1179, density = Density(3f)) { App(Setup(), playing = true) }.use { scene ->
             scene.render()
