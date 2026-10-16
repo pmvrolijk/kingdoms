@@ -48,6 +48,9 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Deb)
             packageName = "Kingdoms"
             packageVersion = "1.0.0"
+            // Rendered by AppIconTest (ICONS=1); Design §8.1.
+            macOS { iconFile.set(project.file("icons/kingdoms.icns")) }
+            linux { iconFile.set(project.file("icons/kingdoms.png")) }
         }
     }
 }

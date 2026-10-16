@@ -50,10 +50,9 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import nl.lamia.kingdoms.core.map.COASTAL_YIELD
+import nl.lamia.kingdoms.core.map.Feature
 import nl.lamia.kingdoms.core.map.GameMap
 import nl.lamia.kingdoms.core.map.MapGenerator
-import nl.lamia.kingdoms.core.map.Resource
 import nl.lamia.kingdoms.core.map.Point
 import nl.lamia.kingdoms.core.rules.GameState
 import kotlin.math.PI
@@ -152,6 +151,8 @@ fun MapView(
     modifier: Modifier = Modifier,
     /** False for a preview: no "can move" dots. */
     interactive: Boolean = true,
+    /** False for the help screen's scenes: no pan, zoom or taps. */
+    gestures: Boolean = true,
 ) {
     val map = game.map
     val board = remember(map) { BoardGeometry(map) }
@@ -194,7 +195,7 @@ fun MapView(
             .clipToBounds()
             .background(Palette.Sea)
             .onSizeChanged { if (cameraState.camera == null && it != IntSize.Zero) cameraState.camera = Camera.fit(map, it) }
-            .pointerInput(map) {
+            .then(if (!gestures) Modifier else Modifier.pointerInput(map) {
                 detectTransformGestures { centroid, pan, zoom, _ ->
                     moveCamera { cam, fitted -> Camera(cam.offset + pan, cam.scale).zoom(zoom, centroid, fitted) }
                 }
@@ -229,7 +230,7 @@ fun MapView(
                     onTap = { if (!touch.multi) currentOnTap(provinceAt(it)) },
                     onLongPress = { if (!touch.multi) currentOnLongPress(provinceAt(it)) },
                 )
-            },
+            }),
     ) {
         // Each layer has its own graphicsLayer: without it, the water's per-frame invalidation
         // re-records the shared parent layer and re-runs the land's draw with every prop.
@@ -254,6 +255,10 @@ fun MapView(
                     val outline = board.provinces[selected]
                     drawPath(outline, Palette.Selected.copy(alpha = 0.35f), style = Stroke(width = 11f * px, join = StrokeJoin.Round))
                     drawPath(outline, Palette.Selected, style = Stroke(width = 4f * px, join = StrokeJoin.Round))
+                    // Rivers on its edge stay visible over the outline: they are what defends it.
+                    map.borders.forEachIndexed { n, b ->
+                        if (b.feature == Feature.River && (b.a == selected || b.b == selected)) drawRiver(board.borders[n])
+                    }
                 }
             }
             arrow?.let { drawArrow(cam.boardToScreen(board.sites[it.from]), cam.boardToScreen(board.sites[it.to]), game.colourOf(it.kingdom)) }
@@ -330,16 +335,18 @@ private fun DrawScope.drawLand(board: BoardGeometry, game: GameState, line: Floa
         val b = Palette.terrain(map.provinces[border.b].terrain)
         drawPath(board.borders[n], lerp(a, b, 0.5f).darker(0.4f), style = Stroke(line, join = StrokeJoin.Round, cap = StrokeCap.Round))
     }
-    board.rivers.forEach {
-        drawPath(it, Palette.River.darker(0.25f), style = Stroke(7f, join = StrokeJoin.Round, cap = StrokeCap.Round))
-        drawPath(it, Palette.River, style = Stroke(5f, join = StrokeJoin.Round, cap = StrokeCap.Round))
-        drawPath(it, Palette.RiverLight, style = Stroke(1.6f, join = StrokeJoin.Round, cap = StrokeCap.Round))
-    }
+    board.rivers.forEach { drawRiver(it) }
     board.decals.forEach { drawDecal(it, line) }
     map.shores.forEachIndexed { n, shore ->
         drawPath(board.shores[n], Palette.terrain(map.provinces[shore.province].terrain).darker(0.5f), style = Stroke(line * 1.6f, join = StrokeJoin.Round, cap = StrokeCap.Round))
     }
     board.props.forEach { drawProp(it, line) }
+}
+
+private fun DrawScope.drawRiver(path: Path) {
+    drawPath(path, Palette.River.darker(0.25f), style = Stroke(7f, join = StrokeJoin.Round, cap = StrokeCap.Round))
+    drawPath(path, Palette.River, style = Stroke(5f, join = StrokeJoin.Round, cap = StrokeCap.Round))
+    drawPath(path, Palette.RiverLight, style = Stroke(1.6f, join = StrokeJoin.Round, cap = StrokeCap.Round))
 }
 
 /** A province's width in board units, about. */
@@ -350,7 +357,7 @@ private val PROVINCE = sqrt(MapGenerator.CELL_AREA).toFloat()
  * down to 60% when provinces are small on screen (a phone). Zooming scales them half as much as
  * the map, so they grow when zoomed in but leave room for the land.
  */
-private fun DrawScope.markerScale(map: GameMap, cam: Camera): Float {
+fun DrawScope.markerScale(map: GameMap, cam: Camera): Float {
     val fit = Camera.fit(map, IntSize(size.width.toInt(), size.height.toInt())).scale
     val atFit = (fit * PROVINCE / 110.dp.toPx()).coerceIn(0.6f, 1f)
     val zoom = cam.scale / fit
@@ -375,17 +382,7 @@ private fun DrawScope.drawBanner(game: GameState, province: Int, site: Offset, t
     val dp = 1.dp.toPx() * scale
     if (owner != null) {
         val capital = game.kingdoms[owner].capital == province
-        val poleFoot = if (capital) drawTower(site, colour, dp) else site - Offset(0f, 8 * dp)
-        val poleTop = poleFoot - Offset(0f, 26 * dp)
-        drawLine(Palette.Ink, poleFoot, poleTop, 2 * dp, cap = StrokeCap.Round)
-        val flag = Path().apply {
-            moveTo(poleTop.x, poleTop.y)
-            lineTo(poleTop.x + 16 * dp, poleTop.y + 5 * dp)
-            lineTo(poleTop.x, poleTop.y + 10 * dp)
-            close()
-        }
-        drawPath(flag, colour)
-        drawPath(flag, colour.darker(0.45f), style = Stroke(1.2f * dp, join = StrokeJoin.Round))
+        drawPennant(if (capital) drawTower(site, colour, dp) else site - Offset(0f, 8 * dp), colour, dp)
     }
     val style = (if (owner == null) BadgeText.copy(color = Palette.Ink) else BadgeText).let { it.copy(fontSize = it.fontSize * scale) }
     val count = text.measure(holding.armies.toString(), style)
@@ -402,7 +399,7 @@ private fun DrawScope.drawBanner(game: GameState, province: Int, site: Offset, t
     }
     // What the province grows, as resource icons — the same row as on the province card.
     val p = game.map.provinces[province]
-    val icons = List(p.terrain.yield) { p.terrain.resource } + if (p.coastal) List(COASTAL_YIELD) { Resource.Fish } else emptyList()
+    val icons = p.grows
     val icon = 12.5f * dp
     var x = site.x - (icons.size * icon + (icons.size - 1) * dp) / 2
     val y = site.y + plate.height / 2 + 1.5f * dp
@@ -424,8 +421,22 @@ private fun DrawScope.drawBanner(game: GameState, province: Int, site: Offset, t
     }
 }
 
+/** A pole from [foot] with a triangular flag in the kingdom's colour. */
+internal fun DrawScope.drawPennant(foot: Offset, colour: Color, dp: Float) {
+    val top = foot - Offset(0f, 26 * dp)
+    drawLine(Palette.Ink, foot, top, 2 * dp, cap = StrokeCap.Round)
+    val flag = Path().apply {
+        moveTo(top.x, top.y)
+        lineTo(top.x + 16 * dp, top.y + 5 * dp)
+        lineTo(top.x, top.y + 10 * dp)
+        close()
+    }
+    drawPath(flag, colour)
+    drawPath(flag, colour.darker(0.45f), style = Stroke(1.2f * dp, join = StrokeJoin.Round))
+}
+
 /** A little stone tower with a cone roof in the kingdom's colour; returns the roof's tip. */
-private fun DrawScope.drawTower(site: Offset, colour: Color, dp: Float): Offset {
+internal fun DrawScope.drawTower(site: Offset, colour: Color, dp: Float): Offset {
     val stone = Color(0xFFEDE4D3)
     val w = 16 * dp
     val h = 18 * dp

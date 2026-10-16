@@ -17,7 +17,16 @@ class MapGeneratorTest {
                 MapConfig(seed = 14, landProvinces = 28, seaFraction = 0.7, featureFraction = 1.0),
             )
 
-    private val maps: List<GameMap> = configs.map(MapGenerator::generate)
+    private val generated: List<GameMap> = configs.map(MapGenerator::generate)
+
+    /** The help screen's hand-laid maps must hold to the same invariants (bar sea tiling and feature share). */
+    private val grids: List<GameMap> = (1L..5L).flatMap { seed ->
+        listOf(3 to 2, 3 to 3, 2 to 3, 4 to 2).map { (cols, rows) ->
+            GridMap.create(cols, rows, List(cols * rows) { Terrain.entries[(it + seed.toInt()) % Terrain.entries.size] }, mapOf((0 to 1) to Feature.River), seed)
+        }
+    }
+
+    private val maps: List<GameMap> = generated + grids
 
     @Test
     fun hitsTheLandProvinceCountExactly() = forEachMap { map ->
@@ -56,7 +65,7 @@ class MapGeneratorTest {
     }
 
     @Test
-    fun cellsTileTheMapExactly() = forEachMap { map ->
+    fun cellsTileTheMapExactly() = generated.forEach { map ->
         val total = map.provinces.sumOf { Polygons.area(it.outline) } + map.seas.sumOf { Polygons.area(it) }
         assertTrue(abs(total - map.width * map.height) < 1e-6 * map.width * map.height, "tiling covers $total of ${map.width * map.height}")
     }
@@ -103,7 +112,7 @@ class MapGeneratorTest {
     }
 
     @Test
-    fun featureShareMatchesConfig() = forEachMap { map ->
+    fun featureShareMatchesConfig() = generated.forEach { map ->
         val expected = (map.borders.size * map.config.featureFraction).roundToInt()
         assertEquals(expected, map.borders.count { it.feature != null })
     }
@@ -127,6 +136,18 @@ class MapGeneratorTest {
         val names = map.provinces.map { it.name }
         assertTrue(names.all { it.isNotBlank() })
         assertEquals(names.size, names.toSet().size, "duplicate names in seed ${map.config.seed}: $names")
+    }
+
+    @Test
+    fun gridMapIsAGrid() {
+        val map = GridMap.create(3, 2, List(6) { Terrain.Plains }, mapOf((4 to 1) to Feature.MountainRange))
+        assertEquals(listOf(1, 3), map.provinces[0].neighbours)
+        assertEquals(listOf(1, 3, 5), map.provinces[4].neighbours)
+        assertEquals(Feature.MountainRange, map.border(1, 4)?.feature)
+        assertEquals(1, map.borders.count { it.feature != null })
+        assertTrue(map.provinces.all { it.coastal }, "every province of a 3 × 2 grid is on the coast")
+        assertEquals(listOf(4), GridMap.create(3, 3, List(9) { Terrain.Hills }).provinces.filter { !it.coastal }.map { it.id })
+        assertEquals(map, GridMap.create(3, 2, List(6) { Terrain.Plains }, mapOf((4 to 1) to Feature.MountainRange)))
     }
 
     @Test

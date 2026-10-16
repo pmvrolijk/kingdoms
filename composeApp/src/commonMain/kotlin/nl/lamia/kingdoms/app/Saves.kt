@@ -32,6 +32,24 @@ interface SaveStore {
     }
 }
 
+/** The saved sound settings, or the defaults when there are none or they cannot be read. */
+fun SaveStore.loadSettings(): SoundSettings = try {
+    read()?.let { Save.json.decodeFromString(SoundSettings.serializer(), it) } ?: SoundSettings()
+} catch (e: IllegalArgumentException) {
+    SoundSettings()
+} catch (e: IOException) {
+    SoundSettings()
+}
+
+/** Saves the sound settings; a failed write only loses them. */
+fun SaveStore.saveSettings(settings: SoundSettings) {
+    try {
+        write(Save.json.encodeToString(SoundSettings.serializer(), settings))
+    } catch (e: IOException) {
+        println("Kingdoms: could not save settings: ${e.message}")
+    }
+}
+
 /** The saved game, or null when there is none or it cannot be read (a save from an incompatible version). */
 fun SaveStore.load(): SavedGame? = try {
     read()?.let { Save.json.decodeFromString(SavedGame.serializer(), it) }
@@ -50,11 +68,14 @@ fun SaveStore.save(game: SavedGame) {
     }
 }
 
-/** `save.json` in [directory], created when needed. Writes go to a temporary file first, so a crash mid-write keeps the old save. */
-class FileSaveStore(directory: String) : SaveStore {
+/**
+ * The file [name] in [directory], created when needed: `save.json` for the game, `settings.json` for
+ * the sound settings. Writes go to a temporary file first, so a crash mid-write keeps the old one.
+ */
+class FileSaveStore(directory: String, name: String = "save.json") : SaveStore {
     private val dir = Path(directory)
-    private val file = Path(dir, "save.json")
-    private val temp = Path(dir, "save.json.tmp")
+    private val file = Path(dir, name)
+    private val temp = Path(dir, "$name.tmp")
 
     override fun read(): String? =
         if (SystemFileSystem.exists(file)) SystemFileSystem.source(file).buffered().use { it.readString() } else null

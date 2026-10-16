@@ -7,7 +7,13 @@ import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSUserDomainMask
 
 @Suppress("FunctionName", "unused") // called from Swift
-fun MainViewController() = ComposeUIViewController { App(store = remember { FileSaveStore(saveDirectory()) }) }
+fun MainViewController() = ComposeUIViewController {
+    App(
+        store = remember { FileSaveStore(saveDirectory()) },
+        speaker = remember { IosSpeaker() },
+        settings = remember { FileSaveStore(saveDirectory(), "settings.json") },
+    )
+}
 
 /** The app's Application Support directory: kept, backed up, not shown to the user. */
 private fun saveDirectory(): String =

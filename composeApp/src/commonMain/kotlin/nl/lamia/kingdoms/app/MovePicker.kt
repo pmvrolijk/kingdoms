@@ -78,7 +78,7 @@ fun MovePicker(game: GameState, pick: Pick, onChange: (Pick) -> Unit, onCancel: 
 
 /** A whole-number slider over 1..[max]; drag or tap. Exposes progress semantics for tests and accessibility. */
 @Composable
-fun AmountSlider(value: Int, max: Int, colour: Color, onChange: (Int) -> Unit, modifier: Modifier = Modifier) {
+fun AmountSlider(value: Int, max: Int, colour: Color, onChange: (Int) -> Unit, modifier: Modifier = Modifier, tag: String = "amount") {
     val current by rememberUpdatedState(onChange)
     val text = rememberTextMeasurer()
     val pad = 14.dp
@@ -86,7 +86,7 @@ fun AmountSlider(value: Int, max: Int, colour: Color, onChange: (Int) -> Unit, m
         modifier
             .fillMaxWidth()
             .height(34.dp)
-            .testTag("amount")
+            .testTag(tag)
             .semantics {
                 progressBarRangeInfo = ProgressBarRangeInfo(value.toFloat(), 1f..maxOf(max, 1).toFloat(), steps = maxOf(0, max - 2))
                 setProgress { v -> current(v.roundToInt().coerceIn(1, maxOf(max, 1))); true }

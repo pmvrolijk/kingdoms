@@ -26,6 +26,7 @@ fun Chip(text: String, active: Boolean = false, enabled: Boolean = true, small: 
         color = if (enabled) Palette.Ink else Palette.Ink.copy(alpha = 0.35f),
     )
     val shape = RoundedCornerShape(7.dp)
+    val sounds = LocalSounds.current
     BasicText(
         text,
         style = style,
@@ -34,7 +35,10 @@ fun Chip(text: String, active: Boolean = false, enabled: Boolean = true, small: 
         modifier = Modifier
             .background(if (active) Palette.Selected else Palette.Selected.copy(alpha = 0.7f), shape)
             .border(if (active) 1.5.dp else 1.dp, Palette.Ink.copy(alpha = if (active) 0.7f else 0.25f), shape)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(enabled = enabled) {
+                onClick()
+                sounds.play(Sound.Click) // after: turning sound on clicks, turning it off does not
+            }
             // About 28 and 34 dp tall: a fingertip, without crowding a phone-height panel.
             .padding(horizontal = if (small) 8.dp else 11.dp, vertical = if (small) 5.dp else 7.dp),
     )

@@ -31,6 +31,7 @@ Multiplatform, targeting Android, iOS and desktop (macOS, Linux).
 ./gradlew :composeApp:run                       # desktop app
 ./gradlew :composeApp:jvmTest                   # snapshots → composeApp/build/snapshots/*.png, UI play tests
 TUNING=1 ./gradlew :core:jvmTest --tests '*TuningReport*' -i | grep REPORT   # Design §9 numbers, ~1 min
+ICONS=1 ./gradlew :composeApp:jvmTest --tests '*AppIconTest*'   # re-render the app icons into the platforms (Design §8.1)
 ./gradlew :androidApp:assembleDebug             # APK → androidApp/build/outputs/apk/debug/
 ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64   # iOS framework without Xcode
 open iosApp/iosApp.xcodeproj                    # iOS app; the build phase calls Gradle
@@ -66,5 +67,7 @@ xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
   paint keeps the stroke otherwise; desktop snapshots do not show it.
 - **Every map layer `Canvas` keeps its own `graphicsLayer()`.** Without it, the animated water
   re-runs the land's draw (all props) every frame (Design §8).
+- **A UI test that shows the help screen sets `mainClock.autoAdvance = false`** and advances the
+  clock by hand: the scenes animate forever, so `waitForIdle` and auto-advance hang the test.
 - **Re-run the tuning report after changing rules, setup or AI.** Unit tests do not catch a
   fairness or game-length regression; the report does (Design §9).

@@ -68,6 +68,7 @@ fun NewGameScreen(
     modifier: Modifier = Modifier,
     resume: GameState? = null,
     onContinue: () -> Unit = {},
+    onHelp: () -> Unit = {},
 ) {
     val map = remember(setup.config) { MapGenerator.generate(setup.config) }
     val preview = remember(map, setup.seats, setup.turnOrder) {
@@ -83,7 +84,16 @@ fun NewGameScreen(
             Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(10.dp),
           ) {
-            BasicText("Kingdoms", style = Label.copy(fontSize = 30.sp, fontWeight = FontWeight.Bold))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                BasicText("Kingdoms", style = Label.copy(fontSize = 30.sp, fontWeight = FontWeight.Bold))
+                Spacer(Modifier.weight(1f))
+                val sounds = LocalSounds.current
+                Chip(if (sounds.settings.muted) "Sound off" else "Sound on", active = !sounds.settings.muted, small = true) {
+                    sounds.change(sounds.settings.copy(muted = !sounds.settings.muted))
+                }
+                Spacer(Modifier.width(5.dp))
+                Chip("How to play", small = true, onClick = onHelp)
+            }
 
             Section("Map") {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {

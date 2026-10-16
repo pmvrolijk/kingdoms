@@ -327,6 +327,8 @@ The map fills the screen; the HUD sits in the corners on parchment panels.
   the neighbour instead to open the **amount picker** next to the target: a slider from 1 to all
   movable, the win chance for an attack and about how many would survive a win, Cancel and
   Move/Attack. An arrow shows the pending move.
+- **Selection.** The selected province gets a bright outline; rivers along its edge are drawn
+  over it, since they are what defends it.
 - **Map labels.** Dashed outlines on valid targets with win chances. In the fitted view, banners
   shrink to 60% when provinces get small on screen; zooming scales them half as much as the map.
   Zoomed in (a province over ~120 dp wide on screen), each province's name fades in under its
@@ -349,9 +351,71 @@ The map fills the screen; the HUD sits in the corners on parchment panels.
   disabled, with a reason, when the map is too small for the kingdoms. With a saved game,
   **Continue · round N** (in the player's colour) sits beside Start, which then reads *Start
   new*; starting one replaces the save.
-- **Menu** (in game): Resume, Restart (same setup, new game seed), New game….
+- **Menu** (in game): Resume, How to play, Restart (same setup, new game seed), New game…, and
+  the sound control (§6.4). AI turns wait while the menu or help is open.
 - **Result**: Victory / Defeat / "X wins" in the winner's colour, rounds played, Play again,
   New game….
+
+### 6.3 Help
+
+**How to play**, from a chip beside the title on the new-game screen and from the in-game menu:
+a panel over everything with seven tabs — Goal, Moving, Attack, Strength, Borders, Growth,
+Tactics — and Close; each tab ends with *Next*. Decided 2026-10-16 (user): tabs rather than one
+scrolling page, each with a looping animation drawn with the game's own pieces.
+
+- **Layout.** The scene on the left with a caption under it (and, where it helps, a strength bar
+  in the HUD's style); a few short lines on the right, with icons from the HUD. Tactics has no
+  scene. Fits the P30 (780 × 360 dp) without scrolling the scene.
+- **Scenes are real maps.** `core.map.GridMap` lays out a 3 × 2 or 3 × 3 grid of provinces with
+  the generator's noisy borders and coasts; it holds to the same invariants as generated maps
+  (tested alongside them). Each scene is a few hand-set `GameState`s over time, drawn by
+  `MapView` with gestures off — plates, pennants, towers, targets, arrows, the clash and the
+  win-chance labels are the game's own, and every chance or survivor count comes from `Battle`
+  in core. An overlay adds only taps (a ripple), armies on the march (shields along the arrow)
+  and growth (each province's resource icons rise into its count, then "+n").
+- **Scenes:** Goal — a capital and two provinces each, then conquest until one kingdom is left,
+  with the territory bar. Moving — all but one march, they arrive fatigued, only the fresh army
+  goes on. Attack — a sure win against a neutral, then an even fight that is lost. Strength — 4 to
+  12 attackers against 6 defenders. Borders — the same attack across an open border, then each
+  feature in turn. Growth — two round ends on a 3 × 3 map; the inland and neutral provinces show
+  the coast bonus and that neutrals do not grow.
+- Wording follows §4; numbers in the text (win chances, survivors, multipliers) are computed, not
+  typed.
+
+### 6.4 Sound
+
+Decided 2026-10-16 (user): the effects are **generated in code**, not files, with variation;
+there is a **volume and mute** setting; "be nice to people". The user liked the victory and the
+click; the first clash rang like a bell and the first march was a white-noise slide; both were redone
+from reference recordings the user chose (only measured, nothing from them ships). Four sounds (`Synth`, pure common Kotlin, deterministic):
+
+| Sound | When | What it is |
+| --- | --- | --- |
+| Click | any button or chip | a 60 ms sine blip falling from 1150 Hz |
+| Clash | a battle (with the clash animation) | swords meeting, modelled on a recorded clash: a short bright scrape, then a ring at ×1, 1.5, 1.96, 2.35 of ~2 kHz with nothing low (a low fundamental made the first version a bell), each partial with a twin 30–90 Hz off for shimmer; the upper partials lead and die first; −11 dB in 0.1 s, 0.85 s in all; 4 variants, each with its own seeded pitch, twins and decays |
+| March | a move into one's own province | two footfalls of grey noise, modelled on a recording of soldiers marching: pink noise without the sub-bass (< 100 Hz), extra body at 150–500 Hz, gently rolled off above ~3 kHz; each step rises in 45 ms and falls ~17 dB before the next, its onset a little brighter (the crunch) with gravel — tiny random ticks of grit around 2 kHz, up to ~900 a second as the foot lands — over a low rumble; about 30% of its energy above 2 kHz, like the recording; steps ~0.42 s apart, near the recording's 0.46 s (the user found three steps at 0.19 s, then two at 0.32 s, too fast), 0.95 s in all; 3 variants with seeded spacing and step levels |
+| Victory | a person wins | ta-da: G+B, then a long C major chord with soft harmonics and vibrato |
+
+- **Being nice.** Every sound fades in and out over 4 ms (no clicks) and is scaled to its own
+  level, so none is louder than intended: Click and Clash are about equally loud (−21 to −19 dBFS
+  RMS over their first 0.2 s), March ~5 dB softer (−26; the user found it too loud beside
+  them; its variants are levelled by that loudness, since its peak is a random stone of gravel),
+  Victory louder (−14.5). Peaks are Click 0.3, March 0.23–0.38 (at most 0.45),
+  Clash 0.7 (it falls fast, so its peak sits high for its loudness), Victory 0.6. The AI's
+  moves play at 60% of the player's; the same sound is not repeated within 60 ms, a march not
+  until the last one has finished (the user: quick moves, the AI's or the player's, piled up), and an action
+  makes at most one battle-or-march sound however many events it has (Skip plays a whole round
+  at once). The help scenes are silent. No defeat sound. iOS uses the Ambient session: the
+  silent switch mutes the game and the player's music keeps playing. Android plays as game
+  audio on the media volume.
+- **Setting.** Volume 0–10 (default 6) and mute, in the in-game menu (Sound on/off and a slider
+  that clicks at the new level); the new-game screen has the Sound on/off chip. The amplitude is
+  (volume / 10)², so the steps sound even. Kept in `settings.json` beside the save (§7); a file
+  that does not parse gives the defaults.
+- **Playback** is per platform behind `Speaker`, passed into `App` like the save store: desktop
+  `javax.sound` clips opened on a background thread (no device: silent after one message),
+  Android `SoundPool` from WAVs written to the cache at launch, iOS `AVAudioPlayer` (two per
+  sound, so a quick repeat overlaps).
 
 ## 7. Save and resume
 
@@ -408,6 +472,26 @@ Cozy, cartoony, cel-shaded — a painted tabletop diorama seen from above at a s
   while one plays). Each has its own `graphicsLayer`; without it the
   water's per-frame invalidation re-runs the land's draw every frame (measured: 150 land draws in
   150 frames without, 1 with).
+
+### 8.1 App icon
+
+Decided 2026-10-17 (user): the player's capital — a forest province, roughly hexagonal — as the
+icon. `AppIcon.kt` draws it with the map's own pieces: the earth slab with its shadow and foam,
+the forest green with the kingdom's tint and inner edge, `Prop.Tree`s, the capital's tower and
+pennant in the first kingdom colour (blue, the player's default). No army count: a number is
+noise at launcher size. The hexagon's sides have a slight seeded wobble, like the map's borders.
+
+- **Grid.** Drawn on Android's adaptive-icon grid, 108 units, with everything inside the 66-unit
+  circle every launcher mask keeps; icons that show the whole square (iOS, desktop) draw the land
+  1.3× larger.
+- **Files**, rendered by `AppIconTest` and written with `ICONS=1`: Android adaptive icon (sea
+  background and land foreground as PNGs per density, `mipmap-anydpi-v26/ic_launcher.xml`;
+  minSdk 26, so no legacy icon); iOS one opaque 1024 px image in `Assets.xcassets`; macOS
+  `composeApp/icons/kingdoms.icns` (a rounded tile, 824 of 1024, via `iconutil`) and Linux
+  `kingdoms.png`. The desktop window draws the icon live (`AppIconPainter`).
+- The test checks that the iOS icon is opaque and shows the player's colour, and that no pixel of
+  the Android foreground lies outside the safe circle; `build/icons/preview.png` shows it under
+  the masks at 192, 96 and 48 px. No Android 13 monochrome layer yet.
 
 ## 9. Tuning targets
 

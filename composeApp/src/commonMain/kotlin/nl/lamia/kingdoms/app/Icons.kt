@@ -16,7 +16,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import nl.lamia.kingdoms.core.map.COASTAL_YIELD
 import nl.lamia.kingdoms.core.map.Feature
+import nl.lamia.kingdoms.core.map.Province
 import nl.lamia.kingdoms.core.map.Resource
 import nl.lamia.kingdoms.core.map.Terrain
 
@@ -55,6 +57,10 @@ fun DrawScope.terrainIcon(terrain: Terrain) = when (terrain) {
         drawProp(Prop.Reeds(18f, 15f, 6f), LINE)
     }
 }
+
+/** What a province grows each round, one icon per army: under its plate on the map and in help. */
+val Province.grows: List<Resource>
+    get() = List(terrain.yield) { terrain.resource } + if (coastal) List(COASTAL_YIELD) { Resource.Fish } else emptyList()
 
 fun DrawScope.resourceIcon(resource: Resource) = when (resource) {
     Resource.Grain -> {

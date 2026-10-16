@@ -10,9 +10,14 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = "Kingdoms",
+        icon = remember { AppIconPainter() },
         state = rememberWindowState(width = 1280.dp, height = 800.dp),
     ) {
-        App(store = remember { FileSaveStore(saveDirectory()) })
+        App(
+            store = remember { FileSaveStore(saveDirectory()) },
+            speaker = remember { JvmSpeaker() },
+            settings = remember { FileSaveStore(saveDirectory(), "settings.json") },
+        )
     }
 }
 

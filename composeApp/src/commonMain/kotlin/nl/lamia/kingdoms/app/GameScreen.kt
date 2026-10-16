@@ -66,6 +66,8 @@ fun GameScreen(
     onChange: (GameState) -> Unit = {},
     /** Opens the game menu; no menu button when null. */
     onMenu: (() -> Unit)? = null,
+    /** The menu or help is open: AI turns wait. */
+    paused: Boolean = false,
 ) {
     var game by remember(start) { mutableStateOf(start) }
     var selected by remember(start) { mutableStateOf<Int?>(null) }
@@ -77,9 +79,12 @@ fun GameScreen(
     var lastMove by remember(start) { mutableStateOf<Arrow?>(null) }
     val cameraState = remember(start.map) { CameraState() }
     val camera = cameraState.camera
+    val sounds = LocalSounds.current
 
-    fun record(next: GameState, events: List<Event>) {
+    /** [loudness]: the player's own moves are full, the AI's softer; a win is always full. */
+    fun record(next: GameState, events: List<Event>, loudness: Float = 1f) {
         game = next
+        for (cue in cues(next, events)) sounds.play(cue, if (cue == Sound.Victory) 1f else loudness)
         onChange(next)
         log = (log + events.mapNotNull { describe(next, it) }).takeLast(5)
         clashes = clashes + events.filterIsInstance<Event.Fought>().map { Clash(it.to, it.kingdom, it.defender, it.result.attackerWon) }
@@ -104,15 +109,15 @@ fun GameScreen(
     }
 
     // AI turns play one action at a time; every new state relaunches this effect.
-    LaunchedEffect(game) {
-        if (game.isOver || game.isHumanTurn) return@LaunchedEffect
+    LaunchedEffect(game, paused) {
+        if (paused || game.isOver || game.isHumanTurn) return@LaunchedEffect
         val action = Ai.decide(game)
         // Let a battle's animation play out before the next move.
         val settle = if (clashes.isNotEmpty()) 350L else 0L
         delay(settle + if (action is Action.Move) AI_MOVE_MILLIS else AI_END_TURN_MILLIS)
         val played = step(game, Ai)
         lastMove = played.events.firstNotNullOfOrNull { it.arrow() }
-        record(played.state, played.events)
+        record(played.state, played.events, AI_LOUDNESS)
     }
 
     fun canMove(from: Int?, to: Int?) = from != null && to != null && game.isHumanTurn &&
@@ -156,7 +161,7 @@ fun GameScreen(
                 onSkip = {
                     val played = playUntilHumanTurn(game, Ai)
                     lastMove = null
-                    record(played.state, played.events)
+                    record(played.state, played.events, AI_LOUDNESS)
                 },
                 onMenu = onMenu,
             )

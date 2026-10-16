@@ -165,6 +165,7 @@ fun LogPanel(entries: List<LogEntry>, modifier: Modifier = Modifier) {
 @Composable
 fun ActionButton(text: String, colour: Color, enabled: Boolean = true, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val fill = if (enabled) colour else Palette.Neutral
+    val sounds = LocalSounds.current
     BasicText(
         text,
         style = Label.copy(
@@ -176,7 +177,10 @@ fun ActionButton(text: String, colour: Color, enabled: Boolean = true, modifier:
             .fillMaxWidth()
             .background(fill, RoundedCornerShape(8.dp))
             .border(1.5.dp, fill.darker(0.4f), RoundedCornerShape(8.dp))
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(enabled = enabled) {
+                onClick()
+                sounds.play(Sound.Click)
+            }
             .padding(vertical = 10.dp),
     )
 }
