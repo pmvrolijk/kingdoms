@@ -8,9 +8,9 @@ session. Keep it short — it earns its value by being short.
 - **Phase:** M6 (platforms and polish) nearly done: autosave/resume and touch tuning (1i); help
   screen, sound effects and app icons (1j) — all checked by the user on a Huawei P30, the icon
   also in the macOS Dock. 1k added a **web target** (Kotlin/Wasm) and **GitHub Actions** for
-  tests and releases (Design §2.4). Left: performance measurement, the iOS ICU warning. Branch
-  `master`; 1k is committed (098ad34) except the native-access flag and these notes. No git
-  remote yet.
+  tests and releases (Design §2.4), and **pacts** against a runaway leader (§4.7), played by the
+  user on desktop. Left: performance measurement, the iOS ICU warning. Branch `master`; 1k is
+  committed (098ad34, 52ce844) except this close-out of Status.md. No git remote yet.
 - **Modules:** `core`, `composeApp`, `androidApp`, `iosApp` (Design §2.1); `core` and `composeApp`
   also target `wasmJs` (browser app in `wasmJsMain`: `WebSaveStore`, `WebSpeaker`, `index.html`). `core.map` generates
   the map (Design §3); `core.rules` is setup, moves, fatigue, battle, growth, elimination
@@ -22,7 +22,7 @@ session. Keep it short — it earns its value by being short.
   is saved after every action and offered as "Continue · round N" on launch (Design §7). How to
   play: seven tabs with looping scenes on real grid maps (§6.3). Sounds generated in code with
   volume and mute (§6.4). App icon drawn by the game for every platform (§8.1). Pacts against a
-  runaway leader and a hinterland-first setup (§4.1, §4.7). 77 core tests (75 common — on JVM,
+  runaway leader and a hinterland-first setup (§4.1, §4.7). 79 core tests (77 common — on JVM,
   Android host, iOS simulator and Wasm/Node — plus JVM-only `ManySeedsTest` over 9000 maps and
   `TuningReport`); composeApp has 34: 10 snapshot, 4 play, 4 help, 5 sound, 5 icon, 2 picker,
   2 touch, 2 save-store (~3 min).
@@ -43,7 +43,8 @@ session. Keep it short — it earns its value by being short.
   and carries its icon), not run. **Web:** the production build served locally, in Chrome on
   macOS (by me, through the browser extension): renders, a move and an AI turn play, the save
   lands in `localStorage` and reload offers Continue on the same board, a Clash buffer starts
-  with the `AudioContext` running (not heard), 120 fps. Not tried: Safari, Firefox, a phone
+  with the `AudioContext` running (not heard), 120 fps. The built site in
+  `composeApp/build/dist` predates pacts until rebuilt. Not tried: Safari, Firefox, a phone
   browser, the help screen on the web.
 - **CI:** `.github/workflows/ci.yml` and `release.yml` are written but **have never run** (no
   GitHub repo yet). What they call was run locally: the CI test command passes; `packageDmg`
@@ -86,8 +87,10 @@ session. Keep it short — it earns its value by being short.
 - **Android signing key:** without the four `ANDROID_*` secrets (Design §2.4) releases carry a
   debug APK that cannot update the previous one. The user makes the keystore (and must keep it:
   a lost key means a new app for Play) and adds the secrets.
-- **Game length after pacts:** Medium median 20 rounds (top of the 12–20 target), Large with 6
-  kingdoms 25. Accepted by the user with the 35/28 choice; revisit if play feels long.
+- **Pact strength:** in play the user won a game the pact stood against (round 15) and lost one
+  where the pact failed against red; fine so far. If people keep beating pacts easily, the
+  levers are the AI's +3 on the target and the 35% trigger (both measurable in the report).
+  Game length (Medium median 20) the user found good in play.
 - Design §11 is empty.
 
 ## 3. To do next
@@ -122,8 +125,8 @@ In order; each milestone ends with something runnable on desktop.
         for private ones), Safari/Firefox/phone-browser check, an Intel macOS build.
   - [ ] Optional: Android 13 monochrome (themed) icon layer; a defeat sound (not asked for).
   - [x] Balance against runaway leaders (1k): pacts on Normal and Hard (35%/28%), hinterland-first
-        setup. Growth caps and upkeep measured and dropped. Played once by the user (seed 1463):
-        the pact turned the tide against the leader, length good.
+        setup; a pact ends below two members, a breaker sits out 3 rounds. Growth caps and upkeep
+        measured and dropped. Played by the user in four desktop games: every pact case seen.
   - [ ] Watch: the remotest kingdom still wins ~2× its share in AI-only games (Design §4.7, §9);
         the pact should bite harder against a person who turtles. Seen in play (1k): a pact
         formed against the user, who still won in round 15; keep an eye on whether it is too soft.
@@ -132,7 +135,7 @@ In order; each milestone ends with something runnable on desktop.
 
 Latest first. Keep the last three sessions; condense older ones to a line under "Earlier".
 
-### 2026-10-17 — Session 1k: web target, CI and releases
+### 2026-10-17/18 — Session 1k: web target, CI and releases, pacts
 
 - User chose: web first, then CI; a new private GitHub repo; .dmg + .deb + APK + web zip; tests
   on push, release on a tag. Design §2.4 (new), §6.4, §7, §8.1, §10; CLAUDE.md commands + 2 rules.
@@ -151,19 +154,10 @@ Latest first. Keep the last three sessions; condense older ones to a line under 
   `packageDmg` passes the vendor check (67 MB .dmg); the packaged app starts. JDK 26 warned that
   Skia loads native code, so the app now runs with `--enable-native-access=ALL-UNNAMED`; the
   warning is gone. The Homebrew-JDK question is closed.
-- **A full game in Chrome** (user asked; 4 kingdoms, Medium, Normal AIs, seed 549751): lost in
-  round 12 to Dunmoor (purple). I eliminated Corrindor (yellow) in round 7 but my richest start
-  drew attacks from two sides; purple, far from the early fighting, snowballed from round 5
-  (stacks of 50–67 by round 10). This matches the far-kingdom effect from 1h; the optional
-  leader-focus for Normal AI would target exactly this. The web build played the whole game with
-  no errors. One false alarm: purple once left my last province alone, but its stack was fatigued.
-- **A second game as the far kingdom** (user: "find a map where you are the far kingdom"; seed
-  1463, picked by measuring capital distances — 6–8 steps from every AI, the AIs 3 from each
-  other): won in round 12. Unopposed expansion gave the most armies by round 3 (37), half the
-  board by round 5 (70 of ~140), then each AI fell in turn (red round 8, purple to yellow, yellow
-  round 12). The AIs kept fighting each other and never ganged up on the leader: one game each
-  way, both decided by distance from the early fighting, not by play. A leader-focus for Normal
-  AI is the lever, if the user wants it (§3 optional).
+- **Two games in Chrome by me** (user asked), before pacts: lost seed 549751 in round 12 to the
+  kingdom far from the early fighting; won seed 1463 as the far kingdom in round 12 (37 armies
+  by round 3, half the board by round 5). Both decided by distance, not play — which led to the
+  pacts. The web build ran both games with no errors.
 - **Runaway balance** (user: a pact against a common threat on Normal and Hard; maybe cap
   growth by upkeep or a province cap). User decided via questions: people in pacts both ways;
   chronicle + turn-panel mark; measure caps before choosing; trigger tuned by simulation; then
@@ -199,9 +193,10 @@ Latest first. Keep the last three sessions; condense older ones to a line under 
   Seeds from before 1k start differently now (hinterland setup).
 - Choices without the user: Wasm only (no JS fallback for older browsers); macOS arm64 only;
   debug APK when there are no secrets; snapshots uploaded from CI; a manual run of the release
-  workflow builds but never publishes. No tuning re-run needed (no rule, setup or AI change).
-- **Picking this up:** the CI first run once the repo is on GitHub, then the open M6 items: P30
-  performance, the iOS ICU warning.
+  workflow builds but never publishes. Breaking a pact needs no AI rule: AIs never attack members.
+- **Picking this up:** when the user has pushed to GitHub, watch the first CI run and a test tag
+  (§2); otherwise the open M6 items: P30 performance, the iOS ICU warning. Rebuild the web app
+  before anyone plays it in a browser.
 
 ### 2026-10-16/17 — Session 1j: help screen, sound effects, app icons
 
