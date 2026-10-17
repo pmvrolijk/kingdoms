@@ -7,6 +7,7 @@ import nl.lamia.kingdoms.core.rules.Action
 import nl.lamia.kingdoms.core.rules.Difficulty
 import nl.lamia.kingdoms.core.rules.Fixtures
 import nl.lamia.kingdoms.core.rules.Holding
+import nl.lamia.kingdoms.core.rules.Pact
 import nl.lamia.kingdoms.core.rules.TurnOrder
 import nl.lamia.kingdoms.core.rules.GameState
 import nl.lamia.kingdoms.core.rules.with
@@ -17,7 +18,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class HeuristicAiTest {
-    private val ai = HeuristicAi { Personality.Balanced }
+    private val ai = HeuristicAi({ Personality.Balanced })
     private val map = Fixtures.map
     private val game = Fixtures.game
 
@@ -95,5 +96,21 @@ class HeuristicAiTest {
         assertTrue(move.to in ring)
         val toBeyond = s.map.provinces.indices.associateWith { p -> if (p == beyond) 0 else if (beyond in map.provinces[p].neighbours) 1 else 2 }
         assertEquals(1, toBeyond.getValue(move.to), "moved to ${move.to}, not next to the front")
+    }
+
+    @Test
+    fun aPactMemberLeavesFellowMembersAloneAndGoesForTheLeader() {
+        val s = mine(home to Holding(0, 20, fresh = 20), target to Holding(1, 2), other to Holding(2, 5))
+        // Without a pact the weak neighbour is the better target.
+        assertEquals(target, assertIs<Action.Move>(ai.decide(s)).to)
+        val allied = s.copy(pact = Pact(against = 2, members = listOf(0, 1)))
+        assertEquals(other, assertIs<Action.Move>(ai.decide(allied)).to)
+    }
+
+    @Test
+    fun theLeaderItselfStillAttacksMembers() {
+        val s = mine(home to Holding(0, 20, fresh = 20), target to Holding(1, 2), other to Holding(2, 5))
+            .copy(pact = Pact(against = 0, members = listOf(1, 2)))
+        assertEquals(target, assertIs<Action.Move>(ai.decide(s)).to)
     }
 }

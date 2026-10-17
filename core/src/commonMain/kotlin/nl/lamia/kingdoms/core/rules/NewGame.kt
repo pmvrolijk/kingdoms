@@ -49,19 +49,28 @@ object NewGame {
         seed: Long,
         humans: Set<Int> = setOf(0),
         turnOrder: TurnOrder = TurnOrder.Shuffled,
-    ): GameState = create(map, seats(kingdoms, humans), seed, turnOrder)
+        options: RuleOptions = RuleOptions(),
+    ): GameState = create(map, seats(kingdoms, humans), seed, turnOrder, options)
 
-    fun create(map: GameMap, seats: List<Seat>, seed: Long, turnOrder: TurnOrder = TurnOrder.Shuffled): GameState {
+    fun create(
+        map: GameMap,
+        seats: List<Seat>,
+        seed: Long,
+        turnOrder: TurnOrder = TurnOrder.Shuffled,
+        options: RuleOptions = RuleOptions(),
+    ): GameState {
         val kingdoms = seats.size
         require(kingdoms in MIN_KINGDOMS..MAX_KINGDOMS) { "kingdoms must be $MIN_KINGDOMS..$MAX_KINGDOMS, was $kingdoms" }
         require(map.config.fits(kingdoms)) { "${map.provinces.size} provinces are too few for $kingdoms kingdoms" }
         val random = Random(mix(seed, SETUP))
         val distances = map.provinces.indices.map { distancesFrom(map, it) }
-        // Fairness first, among layouts at most one step less spread out than the best.
         val layouts = (1..LAYOUTS).map { layout(map, kingdoms, distances, random) }
         val spreadOut = layouts.maxOf { it.minDistance } - 1
+        // Fairness first, among layouts at most one step less spread out than the best: the most even
+        // hinterlands (the remotest kingdom otherwise wins twice its share), then the most even growth;
+        // compensation makes up the growth difference (Design §4.1).
         val best = layouts.filter { it.minDistance >= spreadOut }
-            .minWith(compareBy<Layout> { it.growthSpread }.thenBy { -it.minDistance })
+            .minWith(compareBy<Layout> { it.hinterlandSpread }.thenBy { it.growthSpread }.thenBy { -it.minDistance })
         // Seats are shuffled over the territories, so turn order says nothing about map position.
         val seat = (0 until kingdoms).shuffled(random)
         val capitals = (0 until kingdoms).map { k -> best.capitals[seat.indexOf(k)] }
@@ -101,11 +110,19 @@ object NewGame {
             current = first,
             turnOrder = turnOrder,
             order = order,
+            options = options,
         )
     }
 
     /** A candidate start: territory index per province, capital per territory, and its quality. */
-    private class Layout(val owner: Array<Int?>, val capitals: List<Int>, val minDistance: Int, val growthSpread: Int)
+    private class Layout(
+        val owner: Array<Int?>,
+        val capitals: List<Int>,
+        val minDistance: Int,
+        val growthSpread: Int,
+        /** Largest minus smallest hinterland: the yield of the provinces nearer one capital than any other. */
+        val hinterlandSpread: Int,
+    )
 
     /**
      * One candidate: farthest-point capitals from a random first pick (with one refinement pass),
@@ -134,8 +151,16 @@ object NewGame {
             }
         }
         val growths = (0 until count).map(::growth)
-        val minDistance = capitals.indices.minOf { i -> capitals.indices.filter { it != i }.minOf { distances[capitals[i]][capitals[it]] } }
-        return Layout(owner, capitals, minDistance, growths.max() - growths.min())
+        val nearest = capitals.indices.map { i -> capitals.indices.filter { it != i }.minOf { distances[capitals[i]][capitals[it]] } }
+        val hinterland = IntArray(count)
+        for (p in map.provinces.indices) {
+            val d = capitals.map { distances[it][p] }
+            val closest = d.min()
+            if (d.count { it == closest } == 1) hinterland[d.indexOf(closest)] += map.provinces[p].yield
+        }
+        return Layout(
+            owner, capitals, nearest.min(), growths.max() - growths.min(), hinterland.max() - hinterland.min(),
+        )
     }
 
     private fun distancesFrom(map: GameMap, start: Int): IntArray {

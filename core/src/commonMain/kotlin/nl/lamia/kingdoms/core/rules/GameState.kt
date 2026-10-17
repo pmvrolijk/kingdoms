@@ -52,6 +52,11 @@ data class GameState(
     /** The last kingdom standing, once there is one. */
     val winner: Int? = null,
     val draws: Long = 0,
+    /** The alliance against a runaway leader, if one stands (Design §4.7). */
+    val pact: Pact? = null,
+    /** Kingdoms that broke a pact, with the round they did; they sit out new pacts for a while. */
+    val pactBreakers: Map<Int, Int> = emptyMap(),
+    val options: RuleOptions = RuleOptions(),
 ) {
     fun owner(province: Int): Int? = holdings[province].owner
 

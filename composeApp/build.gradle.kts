@@ -55,6 +55,8 @@ kotlin {
 compose.desktop {
     application {
         mainClass = "nl.lamia.kingdoms.app.MainKt"
+        // Skia loads its native library; newer JDKs warn about that, and will block it, without this.
+        jvmArgs += "--enable-native-access=ALL-UNNAMED"
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Deb)
             packageName = "Kingdoms"

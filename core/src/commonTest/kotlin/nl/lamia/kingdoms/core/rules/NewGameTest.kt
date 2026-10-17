@@ -55,7 +55,8 @@ class NewGameTest {
     @Test
     fun startsAreNearlyEven() = games.forEach { game ->
         val growth = game.kingdoms.map { game.growthOf(it.id) }
-        assertTrue(growth.max() - growth.min() <= 3, "growth $growth, seed ${game.seed}")
+        // Hinterland comes first, so growth may differ more; compensation makes up for it (Design §4.1).
+        assertTrue(growth.max() - growth.min() <= 6, "growth $growth, seed ${game.seed}")
     }
 
     @Test

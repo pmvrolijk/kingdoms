@@ -33,7 +33,8 @@ Multiplatform, targeting Android, iOS and desktop (macOS, Linux).
 ./gradlew :composeApp:wasmJsBrowserDevelopmentRun   # web app on http://localhost:8080
 ./gradlew :composeApp:wasmJsBrowserDistribution     # static site → composeApp/build/dist/wasmJs/productionExecutable
 ./gradlew :composeApp:jvmTest                   # snapshots → composeApp/build/snapshots/*.png, UI play tests
-TUNING=1 ./gradlew :core:jvmTest --tests '*TuningReport*' -i | grep REPORT   # Design §9 numbers, ~1 min
+TUNING=1 ./gradlew :core:jvmTest --tests '*TuningReport*' --rerun -i | grep REPORT   # Design §9 numbers, ~5 min
+TUNING=1 TUNING_QUICK=1 TUNING_VARIANTS=default,none,pact40-33 ./gradlew :core:jvmTest --tests '*TuningReport*' --rerun -i | grep REPORT   # compare rule variants
 ICONS=1 ./gradlew :composeApp:jvmTest --tests '*AppIconTest*'   # re-render the app icons into the platforms (Design §8.1)
 ./gradlew :androidApp:assembleDebug             # APK → androidApp/build/outputs/apk/debug/
 ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64   # iOS framework without Xcode
@@ -77,5 +78,7 @@ xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
   the same `SaveStore`/`Speaker` interfaces as the other platforms.
 - **Release files come from `.github/workflows/release.yml`.** Change packaging there and in the
   Gradle builds together; CI never publishes from a branch, only from a `v*` tag.
+- **Run the tuning report with `--rerun`.** Its `TUNING*` variables are not Gradle inputs, so
+  without it an up-to-date test task prints nothing and an old result looks current.
 - **Re-run the tuning report after changing rules, setup or AI.** Unit tests do not catch a
   fairness or game-length regression; the report does (Design §9).

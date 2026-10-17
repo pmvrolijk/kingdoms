@@ -45,10 +45,22 @@ object Rules {
             target.copy(armies = result.defenderSurvivors, fresh = minOf(target.fresh, result.defenderSurvivors))
         }
         val loser = target.owner
+        var pact = state.pact
+        var breakers = state.pactBreakers
+        if (Pacts.breaks(state, state.current, loser)) {
+            pact = pact!!.copy(members = pact.members - state.current)
+            breakers = breakers + (state.current to state.round)
+            events += Event.PactLeft(state.current, pact.against)
+        }
         if (result.attackerWon && loser != null && holdings.none { it.owner == loser }) {
             events += Event.Eliminated(loser, by = state.current)
         }
-        var next = state.copy(holdings = holdings, draws = state.draws + 1)
+        var next = state.copy(holdings = holdings, draws = state.draws + 1, pact = pact, pactBreakers = breakers)
+        // A pact left with one member, or whose target fell, ends at once (Design §4.7).
+        if (pact != null && !Pacts.holds(next, pact)) {
+            next = next.copy(pact = null)
+            events += Event.PactEnded(pact.against)
+        }
         val alive = next.alive
         if (alive.size == 1) {
             next = next.copy(winner = alive.single())
@@ -64,6 +76,7 @@ object Rules {
         var round = state.round
         var order = state.order
         var draws = state.draws
+        var pact = state.pact
         var next = order.drop(order.indexOf(state.current) + 1).firstOrNull { it in alive }
         if (next == null) {
             val growth = alive.associateWith { state.growthOf(it) }
@@ -71,6 +84,9 @@ object Rules {
                 if (h.owner != null) h.copy(armies = h.armies + state.map.provinces[p].yield) else h
             }
             events += Event.RoundEnded(round, growth)
+            val (updated, pactEvents) = Pacts.update(state.copy(holdings = holdings))
+            pact = updated
+            events += pactEvents
             round++
             order = when (state.turnOrder) {
                 TurnOrder.Fixed -> state.order
@@ -87,7 +103,10 @@ object Rules {
         }
         holdings = holdings.map { if (it.owner == next) it.copy(fresh = it.armies) else it }
         events += Event.TurnStarted(next, round)
-        return Outcome.Applied(state.copy(holdings = holdings, round = round, current = next, order = order, draws = draws), events)
+        return Outcome.Applied(
+            state.copy(holdings = holdings, round = round, current = next, order = order, draws = draws, pact = pact),
+            events,
+        )
     }
 
     private const val BATTLES = 101L

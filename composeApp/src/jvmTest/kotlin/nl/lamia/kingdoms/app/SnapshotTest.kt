@@ -16,8 +16,11 @@ import androidx.compose.ui.use
 import nl.lamia.kingdoms.core.map.MapConfig
 import nl.lamia.kingdoms.core.map.MapGenerator
 import nl.lamia.kingdoms.core.map.MapSize
+import nl.lamia.kingdoms.core.rules.Event
 import nl.lamia.kingdoms.core.rules.GameState
+import nl.lamia.kingdoms.core.rules.Holding
 import nl.lamia.kingdoms.core.rules.NewGame
+import nl.lamia.kingdoms.core.rules.Pact
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
@@ -212,6 +215,29 @@ class SnapshotTest {
         sendPointerEvent(PointerEventType.Press, at, timeMillis = frame * 1000L)
         sendPointerEvent(PointerEventType.Release, at, timeMillis = frame * 1000L + 50)
         render(nanoTime = frame * 1_000_000_000L + 100_000_000L)
+    }
+
+    /** A pact against Brightvale with the player in it: a line in the turn panel, the warning on the card (Design §4.7). */
+    @Test
+    fun aPactShowsInTheTurnPanelAndWarnsBeforeAttackingAnAlly() {
+        val map = MapGenerator.generate(MapConfig.of(MapSize.Medium, seed = 1))
+        val game = NewGame.create(map, kingdoms = 4, seed = 1)
+        val (source, ally) = game.provincesOf(0).filter { game.movable(it) > 0 }.firstNotNullOf { p ->
+            map.provinces[p].neighbours.firstOrNull { game.owner(it) == null }?.let { p to it }
+        }
+        val holdings = game.holdings.toMutableList().apply { this[ally] = Holding(2, 3) }
+        val start = game.copy(holdings = holdings, pact = Pact(against = 1, members = listOf(0, 2, 3)))
+        val camera = Camera.fit(map, IntSize(width, height))
+        ImageComposeScene(width, height) { GameScreen(start, onNewGame = {}, modifier = Modifier.fillMaxSize()) }.use { scene ->
+            scene.render()
+            scene.tap(camera.toScreen(map.provinces[source].site), frame = 1)
+            scene.save("pact.png", frame = 2)
+        }
+        val formed = describe(start, Event.PactFormed(1, listOf(0, 2, 3)))!!.text.text
+        assertEquals("${start.kingdoms[0].name}, ${start.kingdoms[2].name} and ${start.kingdoms[3].name} ally against ${start.kingdoms[1].name}", formed)
+        assertEquals("${start.kingdoms[0].name} breaks the pact against ${start.kingdoms[1].name}", describe(start, Event.PactLeft(0, 1))!!.text.text)
+        assertEquals("The pact against ${start.kingdoms[1].name} ends", describe(start, Event.PactEnded(1))!!.text.text)
+        assertEquals("Pact: ${start.kingdoms[0].name}, ${start.kingdoms[2].name} and ${start.kingdoms[3].name} against ${start.kingdoms[1].name}", pactLine(start)!!.text)
     }
 
     private fun ImageComposeScene.saveAt(name: String, nanoTime: Long) {

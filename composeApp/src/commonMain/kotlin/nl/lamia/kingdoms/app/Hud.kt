@@ -108,7 +108,10 @@ private fun MetricRow(
     }
 }
 
-/** Round, this round's turn order (current kingdom enlarged), whose move it is, End turn / Skip. */
+/**
+ * Round, this round's turn order (current kingdom enlarged), the pact in force, whose move it is,
+ * End turn / Skip.
+ */
 @Composable
 fun TurnPanel(game: GameState, onEndTurn: () -> Unit, onSkip: () -> Unit, onMenu: (() -> Unit)?, modifier: Modifier = Modifier) {
     val k = game.kingdoms[game.current]
@@ -126,6 +129,8 @@ fun TurnPanel(game: GameState, onEndTurn: () -> Unit, onSkip: () -> Unit, onMenu
             }
             onMenu?.let { Spacer(Modifier.width(2.dp)); Chip("Menu", small = true, onClick = it) }
         }
+        // Stays up while the pact lasts; the chronicle's line about it soon scrolls away (Design §4.7).
+        pactLine(game)?.let { BasicText(it, style = Small) }
         val who = when {
             game.isOver -> "Game over"
             k.human -> "Your turn"

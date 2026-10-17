@@ -32,6 +32,15 @@ sealed interface Event {
     data class RoundEnded(val round: Int, val growth: Map<Int, Int>) : Event
 
     data class TurnStarted(val kingdom: Int, val round: Int) : Event
+
+    /** [members] ally against [against], who holds too large a share of all armies (Design §4.7). */
+    data class PactFormed(val against: Int, val members: List<Int>) : Event
+
+    /** The pact against [against] ends: it fell back, fell, or too few kingdoms are left. */
+    data class PactEnded(val against: Int) : Event
+
+    /** [kingdom] attacked a fellow member and is out of the pact against [against]. */
+    data class PactLeft(val kingdom: Int, val against: Int) : Event
 }
 
 enum class Rejection { GameOver, NoSuchProvince, NotYourProvince, NotAdjacent, NothingToMove, InvalidAmount }

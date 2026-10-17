@@ -35,7 +35,11 @@ private const val EASY_BOLDNESS = 0.9
 private const val EASY_CONFIDENCE = 0.8
 private const val LEADER_BONUS = 2.0
 
-class HeuristicAi(private val personality: (kingdom: Int) -> Personality = Personality::forSeat) : Ai {
+/** [pactBonus]: extra value a pact member puts on the leader's provinces (Design §4.7, §5). */
+class HeuristicAi(
+    private val personality: (kingdom: Int) -> Personality = Personality::forSeat,
+    private val pactBonus: Double = 3.0,
+) : Ai {
     override fun decide(state: GameState): Action = attack(state) ?: logistics(state) ?: Action.EndTurn
 
     /**
@@ -72,7 +76,7 @@ class HeuristicAi(private val personality: (kingdom: Int) -> Personality = Perso
             val movable = state.movable(from)
             if (movable == 0) continue
             for (to in state.map.provinces[from].neighbours) {
-                if (state.owner(to) == me) continue
+                if (state.owner(to) == me || isAlly(state, state.owner(to))) continue
                 val chance = state.winChance(from, to, movable)
                 if (chance < skill.boldness) continue
                 val focus = if (leader != null && state.owner(to) == leader) LEADER_BONUS else 0.0
@@ -84,6 +88,12 @@ class HeuristicAi(private val personality: (kingdom: Int) -> Personality = Perso
             }
         }
         return best
+    }
+
+    /** A fellow member of the current kingdom's pact: never attacked. */
+    private fun isAlly(state: GameState, kingdom: Int?): Boolean {
+        val pact = state.pact ?: return false
+        return kingdom != null && kingdom != state.current && state.current in pact.members && kingdom in pact.members
     }
 
     /** The rival with the most armies, other than the current kingdom. */
@@ -99,6 +109,8 @@ class HeuristicAi(private val personality: (kingdom: Int) -> Personality = Perso
         } else {
             if (state.kingdoms[owner].capital == province) value += 2
             if (state.provincesOf(owner).size <= 2) value += 3
+            val pact = state.pact
+            if (pact != null && owner == pact.against && state.current in pact.members) value += pactBonus
         }
         return value
     }
@@ -130,9 +142,8 @@ class HeuristicAi(private val personality: (kingdom: Int) -> Personality = Perso
         val frontier = mine.filter { f -> provinces[f].neighbours.any { state.owner(it) != me } }
         if (frontier.isEmpty()) return null
         val prospect = frontier.associateWith { f ->
-            val attack = provinces[f].neighbours.filter { state.owner(it) != me }.maxOf { e ->
-                value(state, e, p) / (state.holdings[e].armies * state.defence(f, e) + 1)
-            }
+            val attack = provinces[f].neighbours.filter { state.owner(it) != me && !isAlly(state, state.owner(it)) }
+                .maxOfOrNull { e -> value(state, e, p) / (state.holdings[e].armies * state.defence(f, e) + 1) } ?: 0.0
             // Hard: a front an enemy stack could take next turn comes first.
             val threat = if (skill.defendFirst) threat(state, f) else 0.0
             when {

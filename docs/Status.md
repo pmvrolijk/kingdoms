@@ -9,7 +9,8 @@ session. Keep it short — it earns its value by being short.
   screen, sound effects and app icons (1j) — all checked by the user on a Huawei P30, the icon
   also in the macOS Dock. 1k added a **web target** (Kotlin/Wasm) and **GitHub Actions** for
   tests and releases (Design §2.4). Left: performance measurement, the iOS ICU warning. Branch
-  `master`; session 1k is uncommitted at close. No git remote yet.
+  `master`; 1k is committed (098ad34) except the native-access flag and these notes. No git
+  remote yet.
 - **Modules:** `core`, `composeApp`, `androidApp`, `iosApp` (Design §2.1); `core` and `composeApp`
   also target `wasmJs` (browser app in `wasmJsMain`: `WebSaveStore`, `WebSpeaker`, `index.html`). `core.map` generates
   the map (Design §3); `core.rules` is setup, moves, fatigue, battle, growth, elimination
@@ -20,10 +21,11 @@ session. Keep it short — it earns its value by being short.
   half the zoom, province names when zoomed in, clash animation, result panel. The game in play
   is saved after every action and offered as "Continue · round N" on launch (Design §7). How to
   play: seven tabs with looping scenes on real grid maps (§6.3). Sounds generated in code with
-  volume and mute (§6.4). App icon drawn by the game for every platform (§8.1). 66 core tests
-  (64 common — on JVM, Android host, iOS simulator and Wasm/Node — plus JVM-only
-  `ManySeedsTest` over 9000 maps and `TuningReport`); composeApp has 33: 9 snapshot, 4 play,
-  4 help, 5 sound, 5 icon, 2 picker, 2 touch, 2 save-store (~3 min).
+  volume and mute (§6.4). App icon drawn by the game for every platform (§8.1). Pacts against a
+  runaway leader and a hinterland-first setup (§4.1, §4.7). 77 core tests (75 common — on JVM,
+  Android host, iOS simulator and Wasm/Node — plus JVM-only `ManySeedsTest` over 9000 maps and
+  `TuningReport`); composeApp has 34: 10 snapshot, 4 play, 4 help, 5 sound, 5 icon, 2 picker,
+  2 touch, 2 save-store (~3 min).
 - **M1 verified:** 14 property tests over 34 maps (10 seeds × 3 presets, plus 6, 120, no-sea and
   70%-sea/all-features) pass on JVM, Android host and iOS simulator: exact province count,
   connected land, symmetric neighbours, shared border paths identical in both outlines, cells
@@ -84,10 +86,8 @@ session. Keep it short — it earns its value by being short.
 - **Android signing key:** without the four `ANDROID_*` secrets (Design §2.4) releases carry a
   debug APK that cannot update the previous one. The user makes the keystore (and must keep it:
   a lost key means a new app for Play) and adds the secrets.
-- **Local desktop packaging and the JDK:** releases are packaged on CI with Temurin, so this only
-  matters locally: `packageDmg` refuses the Homebrew JDK. Another JDK or
-  `compose.desktop.packaging.checkJdkVendor=false` in `gradle.properties` — the user's call
-  (1k packaged with `-P…checkJdkVendor=false` on the command line).
+- **Game length after pacts:** Medium median 20 rounds (top of the 12–20 target), Large with 6
+  kingdoms 25. Accepted by the user with the 35/28 choice; revisit if play feels long.
 - Design §11 is empty.
 
 ## 3. To do next
@@ -121,6 +121,12 @@ In order; each milestone ends with something runnable on desktop.
   - [ ] Optional: host the web build somewhere (GitHub Pages needs a public repo or a paid plan
         for private ones), Safari/Firefox/phone-browser check, an Intel macOS build.
   - [ ] Optional: Android 13 monochrome (themed) icon layer; a defeat sound (not asked for).
+  - [x] Balance against runaway leaders (1k): pacts on Normal and Hard (35%/28%), hinterland-first
+        setup. Growth caps and upkeep measured and dropped. Played once by the user (seed 1463):
+        the pact turned the tide against the leader, length good.
+  - [ ] Watch: the remotest kingdom still wins ~2× its share in AI-only games (Design §4.7, §9);
+        the pact should bite harder against a person who turtles. Seen in play (1k): a pact
+        formed against the user, who still won in round 15; keep an eye on whether it is too soft.
 
 ## 4. Handover
 
@@ -141,12 +147,61 @@ Latest first. Keep the last three sessions; condense older ones to a line under 
 - **CI:** `ci.yml` (tests, snapshots kept 7 days) and `release.yml` (version from the tag; macOS
   on `macos-latest`, so Apple silicon only; signed APK only with secrets). One app version in
   `libs.versions.toml` (1.0.0 — Android was 0.1.0, but macOS needs major ≥ 1).
+- **Local packaging** (user: use the JetBrains Temurin): with `JAVA_HOME` on Temurin 26
+  `packageDmg` passes the vendor check (67 MB .dmg); the packaged app starts. JDK 26 warned that
+  Skia loads native code, so the app now runs with `--enable-native-access=ALL-UNNAMED`; the
+  warning is gone. The Homebrew-JDK question is closed.
+- **A full game in Chrome** (user asked; 4 kingdoms, Medium, Normal AIs, seed 549751): lost in
+  round 12 to Dunmoor (purple). I eliminated Corrindor (yellow) in round 7 but my richest start
+  drew attacks from two sides; purple, far from the early fighting, snowballed from round 5
+  (stacks of 50–67 by round 10). This matches the far-kingdom effect from 1h; the optional
+  leader-focus for Normal AI would target exactly this. The web build played the whole game with
+  no errors. One false alarm: purple once left my last province alone, but its stack was fatigued.
+- **A second game as the far kingdom** (user: "find a map where you are the far kingdom"; seed
+  1463, picked by measuring capital distances — 6–8 steps from every AI, the AIs 3 from each
+  other): won in round 12. Unopposed expansion gave the most armies by round 3 (37), half the
+  board by round 5 (70 of ~140), then each AI fell in turn (red round 8, purple to yellow, yellow
+  round 12). The AIs kept fighting each other and never ganged up on the leader: one game each
+  way, both decided by distance from the early fighting, not by play. A leader-focus for Normal
+  AI is the lever, if the user wants it (§3 optional).
+- **Runaway balance** (user: a pact against a common threat on Normal and Hard; maybe cap
+  growth by upkeep or a province cap). User decided via questions: people in pacts both ways;
+  chronicle + turn-panel mark; measure caps before choosing; trigger tuned by simulation; then
+  35%/28%, caps dropped, hinterland-first setup without a growth guard, try exposure
+  compensation. New report metrics: leader after round 5/8 wins, farthest/remotest/quietest
+  kingdom wins; `TUNING_QUICK`, `TUNING_VARIANTS`. Findings (Design §4.7, §9): the pact cuts
+  the round-5 leader's wins 69–75% → 49–55% but games run ~5 rounds longer (Medium median 20);
+  caps, upkeep, growth-share trigger, exposure compensation (1–5/step) and neutrals-first moved
+  nothing beyond noise; geography is the cause — the remotest kingdom won 55%, now 47–49%.
+  I first reported hinterland balance as 55→45% without saying it loosened growth fairness;
+  with a guard it was 51%; corrected and the user chose the unguarded version (growth spread
+  ≤ 6, `startsAreNearlyEven` bound 3 → 6, compensation covers it).
+- **Difficulty moved:** Hard alone vs Normal 36% → 26–27%, Easy 17% → 11–12%, mostly from the
+  new setup, not the pact. From the player's seat it still scales: one Normal beats three Easy
+  33%, Normal 24%, Hard 18% (report now prints both directions).
+- Code: `Pacts.kt` (`Pact`, `RuleOptions`, update at round end, `holds`),
+  `Event.PactFormed/Ended/Left`, `GameState.pact/pactBreakers/options`, AI ally filter and +3
+  bonus, `NewGame` hinterland; app chronicle lines, a "Pact: … against …" line in the turn panel
+  (`pactLine`), province-card warning; `PactTest` (11), 2 AI tests, snapshot `pact.png`.
+- Played by the user: seed 1463 (not the remotest seat): red grew fastest, the others allied
+  against it, later against purple; "more interesting, with the tide turning", length good. The
+  swords mark was unclear and the pact's chronicle line scrolled away, so the turn panel now shows
+  "Pact: A, B and C against D" while it lasts. A second game where the user swept the board with
+  no pact turned out to be the stale 11:49 web build (before pacts); rebuild the web app before
+  playing it. Then a game where the user broke a pact left "Pact: Corrindor against Dunmoor", a
+  one-member pact, so the user decided: a pact ends at once below two members (or when its
+  target falls), and a breaker sits out new pacts for 3 rounds (`RuleOptions.breakerSitsOut`).
+  Tuning re-run: unchanged within noise (AIs never break pacts; Medium k=4 leader 51–55%,
+  median 20, remotest 48–49%; player seat vs Easy/Normal/Hard 34/26/19%).
+  Replayed by the user after the change: red ran away, the pact formed, the user (in it) lost
+  anyway — "works". Then a random game: the pact formed against the user, ended when Brightvale
+  fell (two kingdoms left), and the user won in round 15 — "fun game".
+  Seeds from before 1k start differently now (hinterland setup).
 - Choices without the user: Wasm only (no JS fallback for older browsers); macOS arm64 only;
   debug APK when there are no secrets; snapshots uploaded from CI; a manual run of the release
   workflow builds but never publishes. No tuning re-run needed (no rule, setup or AI change).
-- **Picking this up:** once the user has pushed to GitHub, check the first CI run (the Linux
-  composeApp tests are the unknown), then a test tag for the release. Then the open M6 items:
-  P30 performance, the iOS ICU warning.
+- **Picking this up:** the CI first run once the repo is on GitHub, then the open M6 items: P30
+  performance, the iOS ICU warning.
 
 ### 2026-10-16/17 — Session 1j: help screen, sound effects, app icons
 

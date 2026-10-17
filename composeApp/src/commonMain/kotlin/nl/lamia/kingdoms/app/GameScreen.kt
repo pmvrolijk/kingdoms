@@ -225,10 +225,29 @@ private fun Event.arrow(): Arrow? = when (this) {
     else -> null
 }
 
+private fun AnnotatedString.Builder.kingdom(game: GameState, k: Int) =
+    withStyle(SpanStyle(color = game.colourOf(k).darker(0.25f), fontWeight = FontWeight.Bold)) { append(game.kingdoms[k].name) }
+
+/** "A, B and C", each name in its kingdom's colour. */
+private fun AnnotatedString.Builder.kingdoms(game: GameState, ks: List<Int>) = ks.forEachIndexed { i, k ->
+    if (i > 0) append(if (i == ks.lastIndex) " and " else ", ")
+    kingdom(game, k)
+}
+
+/** The pact in force as one line, "Pact: A, B and C against D", shown while it lasts (Design §4.7). */
+internal fun pactLine(game: GameState): AnnotatedString? {
+    val pact = game.pact ?: return null
+    return buildAnnotatedString {
+        append("Pact: ")
+        kingdoms(game, pact.members.filter { game.isAlive(it) })
+        append(" against ")
+        kingdom(game, pact.against)
+    }
+}
+
 /** An event as a line of the chronicle, with kingdom names in their colours and the numbers dimmed. */
-private fun describe(game: GameState, event: Event): LogEntry? {
-    fun AnnotatedString.Builder.kingdom(k: Int) =
-        withStyle(SpanStyle(color = game.colourOf(k).darker(0.25f), fontWeight = FontWeight.Bold)) { append(game.kingdoms[k].name) }
+internal fun describe(game: GameState, event: Event): LogEntry? {
+    fun AnnotatedString.Builder.kingdom(k: Int) = kingdom(game, k)
     fun AnnotatedString.Builder.place(p: Int) =
         withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(game.map.provinces[p].name) }
     fun AnnotatedString.Builder.dim(text: String) = withStyle(SpanStyle(color = Palette.Ink.copy(alpha = 0.55f))) { append(text) }
@@ -253,6 +272,21 @@ private fun describe(game: GameState, event: Event): LogEntry? {
         is Event.Won -> LogEntry(game.colourOf(event.kingdom), buildAnnotatedString {
             kingdom(event.kingdom)
             append(" rules the land")
+        })
+        is Event.PactFormed -> LogEntry(null, buildAnnotatedString {
+            kingdoms(game, event.members)
+            append(" ally against ")
+            kingdom(event.against)
+        })
+        is Event.PactEnded -> LogEntry(null, buildAnnotatedString {
+            append("The pact against ")
+            kingdom(event.against)
+            append(" ends")
+        })
+        is Event.PactLeft -> LogEntry(game.colourOf(event.kingdom), buildAnnotatedString {
+            kingdom(event.kingdom)
+            append(" breaks the pact against ")
+            kingdom(event.against)
         })
         is Event.Moved, is Event.TurnStarted, is Event.RoundEnded -> null
     }

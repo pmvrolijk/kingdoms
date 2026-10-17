@@ -104,6 +104,20 @@ fun ProvinceCard(game: GameState, id: Int, modifier: Modifier = Modifier, compac
             }
         }
 
+        // A person in a pact is told before attacking a fellow member breaks it (Design §4.7).
+        val pact = game.pact
+        if (pact != null && game.isHumanTurn && game.current in pact.members && game.movable(id) > 0) {
+            val allies = p.neighbours.mapNotNull { game.owner(it) }.filter { it != game.current && it in pact.members }.distinct()
+            if (allies.isNotEmpty()) {
+                BasicText(
+                    "In the pact against ${game.kingdoms[pact.against].name}: attacking " +
+                        allies.joinToString(" or ") { game.kingdoms[it].name } + " breaks it, and no pact " +
+                        "takes you for ${game.options.breakerSitsOut} rounds",
+                    style = Small.copy(color = Palette.Ink.copy(alpha = 0.8f), fontWeight = FontWeight.Bold),
+                )
+            }
+        }
+
         if (!compact && game.isHumanTurn && game.movable(id) > 0) {
             BasicText(
                 "Pick a neighbour to send ${game.movable(id)} · long-press or right-click it to choose how many",

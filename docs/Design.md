@@ -60,8 +60,8 @@ mutates state.
 ### 2.3 State model
 
 `GameState` (package `core.rules`) is an immutable value: the map, the kingdoms, one `Holding`
-(owner, armies, fresh armies) per province, round, current kingdom, winner, and a `draws`
-counter. `Rules.apply(state, action)` is the only way state changes; it returns
+(owner, armies, fresh armies) per province, round, current kingdom, winner, a `draws`
+counter, the standing pact and who broke one when (§4.7), and the pact settings (`RuleOptions`). `Rules.apply(state, action)` is the only way state changes; it returns
 `Outcome.Applied(state, events)` or `Outcome.Rejected(reason)`. Human input and AI produce the
 same `Action`s (`Move(from, to, armies?)`, `EndTurn`). Events (moves, battles, eliminations,
 round ends, turn starts, victory) come back with the new state so the UI can describe and
@@ -91,6 +91,9 @@ Added 2026-10-17 (user: "support the web target", "distributions in a GitHub Act
   `Kingdoms-X.Y.Z-web.zip`. Started by hand from the Actions tab, it builds the same files as
   downloads on the run, with the default version, and publishes nothing. CI uses Temurin 21, so
   Compose's JDK-vendor check passes there.
+- **Local packaging** needs a JDK Compose accepts (e.g. Temurin as `JAVA_HOME`; the Homebrew JDK
+  is refused). The packaged app runs with `--enable-native-access=ALL-UNNAMED`, since newer JDKs
+  warn about, and will block, Skia loading its native library.
 - **Android signing.** With the repository secrets `ANDROID_KEYSTORE_BASE64`,
   `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` the APK is a signed
   release build (the build reads `KINGDOMS_KEYSTORE*`/`KINGDOMS_KEY_*` from the environment);
@@ -208,8 +211,14 @@ count matches.
 - Each kingdom starts with a **capital** and two neighbouring provinces. The setup tries 80
   candidate layouts — farthest-point capitals over graph distance from a random first pick, one
   refinement pass, then starting neighbours claimed in passes where the poorest kingdom picks
-  first and takes the richest province next to its capital — and keeps the one with the smallest
-  spread in starting growth among those at most one step less spread out than the best.
+  first and takes the richest province next to its capital. Among the layouts at most one step
+  less spread out than the best it keeps the one with the most even **hinterlands** — each
+  kingdom's hinterland is the yield of the provinces nearer its capital than any other — then
+  the smallest spread in starting growth. Decided 2026-10-17 (user): hinterland before growth.
+  Measured (Medium, 4 kingdoms, 600 games, no pact): the kingdom whose capital is remotest from
+  the rest won 55% with growth first and 45% with hinterland first (fair 25%). Starting growth
+  then differs more — on average 2.5 instead of 1.4, at most 6 (Large, 6 kingdoms) — and
+  compensation (below) makes up for it: the richest start still wins only 28–31%.
 - Territories are dealt to seats at random, so turn order says nothing about map position.
 - Each owned province starts with 2 armies, the capital with 5. A kingdom whose starting growth
   is below the best gets **3 rounds of its shortfall** as extra capital armies.
@@ -292,6 +301,42 @@ per turn (§4.3). A kingdom stretched into a long column cannot abandon its tail
 A kingdom with no provinces is eliminated. The last kingdom with provinces wins. If the player is
 eliminated the game ends in defeat.
 
+### 4.7 Pacts
+
+Decided 2026-10-17 (user): when one kingdom runs away with the game, the others ally against it —
+on Normal and Hard, with people taking part both ways.
+
+- **Forming.** At the end of a round, after growth: if at least three kingdoms are alive and one
+  holds **≥ 35% of all armies** (no tie for most), a pact forms against it. Its members are all
+  other living kingdoms except Easy AIs (too disorganised to join) and kingdoms that broke a pact
+  in this round or the two before (they sit out **3 rounds**); it needs at least two.
+- **Ending.** At the end of a round the pact ends when its target holds **< 28%** of all armies.
+  The gap keeps it from flickering. It ends at once, mid-round, when fewer than two living members
+  remain, its target falls, or fewer than three kingdoms remain (decided 2026-10-17: a lone member
+  is no pact). A new pact can form at the end of the round, against the same kingdom or another.
+- **Members** do not attack each other. AI members value the target's provinces +3 (§5). A
+  person in the pact may still attack a fellow member, but then leaves it: the AIs may attack
+  them again, and the breaker sits out new pacts for 3 rounds (decided 2026-10-17: otherwise a pact
+  that ends re-forms at once with the breaker back in, and breaking is free). The target is not
+  restricted. The breakers are kept in `GameState.pactBreakers` and saved.
+- **People take part both ways:** a leading person is the target of the AIs' pact; when an AI
+  leads, the person is a member and the AI members leave them alone.
+- **Shown** in the chronicle ("Brightvale, Corrindor and Dunmoor ally against Aldmere", "The pact
+  against Aldmere ends", "Aldmere breaks the pact against Dunmoor"); for as long as it lasts, as a
+  line in the turn panel ("Pact: Brightvale, Corrindor and Dunmoor against Aldmere", names in their
+  colours), since the chronicle shows only three lines; and on the province card of a member's province next to a
+  fellow member ("attacking Dunmoor breaks it, and no pact takes you for 3 rounds") (§6.1).
+- **Measured** (mixed AIs, 600 games): the army leader after round 5 goes on to win 56–57%
+  instead of 69–75% (Medium, 4 kingdoms); games run longer — median 20 rounds instead of 14 on
+  Medium, 25 instead of 18 on Large with 6. The user chose 35/28 over 40/33 (leader 58%, median
+  18) and 45/38 (64%, 17).
+- **Not adopted** (measured the same way, 2026-10-17): a per-province growth cap (5 or 8 armies
+  per point of yield), army upkeep (−1 growth per 6, 8 or 10 armies), a pact measured by growth
+  instead of armies, extra capital armies for exposed capitals (1–5 per step nearer the rivals),
+  and AIs taking free land before fighting kingdoms. None moved the leader or the remote-kingdom
+  numbers beyond noise (±3 points): games are decided by land taken early, not by stockpiles.
+  The remotest kingdom still wins about twice its share in AI-only games (§9).
+
 ## 5. AI
 
 Heuristic, cheap, deterministic (same state, same action), and runs in `core.ai`. Each call
@@ -301,21 +346,27 @@ returns one action; the AI is asked again until it ends its turn.
    chance with all movable armies is at least the personality's *boldness*, pick the highest
    `chance × value / (1 + 0.1 × defenders)`. Value is the target's yield, plus 2 for a capital,
    plus 3 if its owner has two provinces or fewer, plus the personality's *neutral bias* for a
-   neutral. **Commit** the larger of: the fewest armies reaching the personality's *confidence*,
+   neutral, plus 3 for a pact member on the pact's target (§4.7). A pact member never attacks a
+   fellow member. **Commit** the larger of: the fewest armies reaching the personality's *confidence*,
    and everything except a guard as large as the biggest other enemy stack next to the source.
 2. **Logistics.** Move fresh armies from an interior province one step towards the frontier
    province with the best prospect — the best `value / (defenders × border defence + 1)` of its
-   targets — divided by `1 + distance`. Supply goes where an attack can succeed, not merely to the
+   targets, fellow pact members not counted — divided by `1 + distance`. Supply goes where an attack can succeed, not merely to the
    nearest front: nearest-front supply deadlocked equal stacks across mountain borders.
 3. **End turn.**
 
 **Difficulty** (chosen per AI on the new-game screen) changes skill, not personality:
 
-| Difficulty | Plays | Measured: one vs three Normal (fair 25%) |
-| --- | --- | --- |
-| Easy | Attacks only at ≥ 90%, commits for 80%, supplies the nearest front every other round | 14% |
-| Normal | As above | 23% |
-| Hard | Normal, plus: fronts an enemy stack could take next turn get supply first; +2 value on the strongest rival's provinces | 34% |
+| Difficulty | Plays | One vs three Normal | One Normal vs three of these |
+| --- | --- | --- | --- |
+| Easy | Attacks only at ≥ 90%, commits for 80%, supplies the nearest front every other round; never in a pact | 11% | 33% |
+| Normal | As above | 24% | 24% |
+| Hard | Normal, plus: fronts an enemy stack could take next turn get supply first; +2 value on the strongest rival's provinces | 26% | 18% |
+
+Measured on Medium with 4 kingdoms, 400 games, fair 25% (2026-10-17, with pacts and the
+hinterland setup). The last column stands in for the player: how often one Normal kingdom beats
+three of that level. Hard alone against Normal won 34–36% with the old growth-first setup and
+pacts change little (27% without them): a Hard kingdom that pulls ahead now meets a pact.
 
 | Personality | Boldness | Confidence | Neutral bias | Plays seats |
 | --- | --- | --- | --- | --- |
@@ -342,17 +393,19 @@ The map fills the screen; the HUD sits in the corners on parchment panels.
   its colour: *production* (growth per round), *territory* (provinces), *armies* (total). The
   player's segment is outlined and the player's own value is printed at the end of each bar.
 - **Top right — turn.** Round number; this round's turn order as coloured dots, the current
-  kingdom enlarged; whose move it is (an AI shows its personality); **End turn** on the player's
+  kingdom enlarged; the pact in force as one line, "Pact: A, B and C against D" (§4.7); whose move it is (an AI
+  shows its personality); **End turn** on the player's
   turn, **Skip** during AI turns; a Menu button. Under it, a short **chronicle** of the last
   three events, told with names: "Aldmere takes Thornwick from Brightvale", "Brightvale is
-  defeated at Millbrook", "Dunmoor falls to Aldmere" — kingdom names in their colours, the
+  defeated at Millbrook", "Dunmoor falls to Aldmere", and pacts forming, ending and broken — kingdom names in their colours, the
   numbers dimmed, older lines faded.
 - **Selected province — card.** Bottom of the screen, on the side away from the province so it
   never covers it: terrain icon, province name, terrain, owner, capital; *Grows* as one resource icon per army grown
   (coastal Plains: grain, grain, fish); armies with a shield icon and — for the current kingdom's
   provinces — a stacked bar of *can move* / *stays* (the one army that must remain) / *fatigued*
-  (moved this turn), with a legend; defended borders with feature icons and multipliers; and a
-  one-line how-to while a move is possible.
+  (moved this turn), with a legend; defended borders with feature icons and multipliers; for a
+  person in a pact, a warning when the province borders a fellow member ("In the pact against
+  Brightvale: attacking Dunmoor breaks it, and no pact takes you for 3 rounds"); and a one-line how-to while a move is possible.
 - **Moves.** Click a province, then a neighbour: all movable armies go. Right-click or long-press
   the neighbour instead to open the **amount picker** next to the target: a slider from 1 to all
   movable, the win chance for an attack and about how many would survive a win, Cancel and
@@ -473,6 +526,8 @@ button on the new-game screen rather than launching straight into the game.
   by ~1e-13. Rules and AI never read coordinates, and a border point shared by two outlines is
   parsed the same way in both, so play is unchanged; `SaveTest` compares everything else exactly
   and coordinates to 1e-12.
+- The pact and its settings are part of `GameState`, so they are saved; a save from before pacts
+  loads with no pact and the default settings.
 - Not saved: the chronicle, the last AI arrow, the camera, the selection.
 
 ## 8. Visual style
@@ -538,8 +593,19 @@ Measured by AI-vs-AI simulation in `core` tests, not by feel alone:
 
 Guidelines, not rules — the game itself has no round or time limit.
 
-- Median game length for 4 kingdoms on the Medium map: 12–20 rounds.
-- No single starting position wins more than 40% of simulated 4-kingdom games.
+- Median game length for 4 kingdoms on the Medium map: 12–20 rounds. Measured: 20 (p10 15,
+  p90 29); Small 14–15, Large 24–25.
+- No single starting position wins more than 40% of simulated 4-kingdom games. Measured by seat
+  (seats are dealt at random): 20–31%. By geography it is not met: the kingdom whose capital is
+  remotest from the rest (largest summed distance) wins 47–49% of 4-kingdom games where one is
+  clearly remotest (about half of them) and 36–43% with 6 (fair 17%). Pacts and the
+  hinterland setup brought it down from 55% (§4.1, §4.7); the levers that did not help are in
+  §4.7.
+- **Runaway** (`leaderR5Wins`, `leaderR8Wins` in the report): the army leader at the start of
+  round 5 goes on to win 49–55% of 4-kingdom games (69–75% before pacts), at round 8 67–69%.
+  The report also counts the quietest kingdom (fewest battles with kingdoms in rounds 1–6):
+  it wins 19–37% of 4-kingdom games, 2–10% with 6 — staying out of early fights is not by
+  itself what wins.
 - Simulated games end. The simulation harness has a round cap; hitting it flags a stalemate as a
   defect to tune away. The cap exists only in tests.
 
