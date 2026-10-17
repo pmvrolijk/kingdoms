@@ -27,8 +27,11 @@ Multiplatform, targeting Android, iOS and desktop (macOS, Linux).
 
 ```sh
 ./gradlew :core:jvmTest                         # fast loop: core tests on the JVM
-./gradlew :core:allTests                        # core tests on JVM, Android host and iOS simulator
+./gradlew :core:allTests                        # core tests on JVM, Android host, iOS simulator and Wasm (Node)
+./gradlew :core:wasmJsNodeTest                  # core tests on Wasm only
 ./gradlew :composeApp:run                       # desktop app
+./gradlew :composeApp:wasmJsBrowserDevelopmentRun   # web app on http://localhost:8080
+./gradlew :composeApp:wasmJsBrowserDistribution     # static site → composeApp/build/dist/wasmJs/productionExecutable
 ./gradlew :composeApp:jvmTest                   # snapshots → composeApp/build/snapshots/*.png, UI play tests
 TUNING=1 ./gradlew :core:jvmTest --tests '*TuningReport*' -i | grep REPORT   # Design §9 numbers, ~1 min
 ICONS=1 ./gradlew :composeApp:jvmTest --tests '*AppIconTest*'   # re-render the app icons into the platforms (Design §8.1)
@@ -39,7 +42,8 @@ xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
   -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.2' build   # iOS app from the CLI
 ```
 
-- Versions live in `gradle/libs.versions.toml` only. Compose Multiplatform 1.12 requires
+- Versions live in `gradle/libs.versions.toml` only, the app's own (`kingdoms`) included; a release
+  tag overrides it with `-Pkingdoms.version` (Design §2.4). Compose Multiplatform 1.12 requires
   `compileSdk` 37; do not lower it.
 - `iosApp` uses a folder-synced group: new Swift files in `iosApp/iosApp/` are picked up without
   editing `project.pbxproj`. Keep `Info.plist` outside that folder, or it is copied as a resource
@@ -69,5 +73,9 @@ xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
   re-runs the land's draw (all props) every frame (Design §8).
 - **A UI test that shows the help screen sets `mainClock.autoAdvance = false`** and advances the
   clock by hand: the scenes animate forever, so `waitForIdle` and auto-advance hang the test.
+- **Web code calls JavaScript only from `wasmJsMain`** (`js("…")` in top-level functions), behind
+  the same `SaveStore`/`Speaker` interfaces as the other platforms.
+- **Release files come from `.github/workflows/release.yml`.** Change packaging there and in the
+  Gradle builds together; CI never publishes from a branch, only from a `v*` tag.
 - **Re-run the tuning report after changing rules, setup or AI.** Unit tests do not catch a
   fairness or game-length regression; the report does (Design §9).

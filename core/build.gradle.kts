@@ -14,6 +14,9 @@ kotlin {
     jvm()
     iosArm64()
     iosSimulatorArm64()
+    // The browser app (Design §2); tests run in Node, no browser needed.
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+    wasmJs { nodejs() }
 
     sourceSets {
         commonMain.dependencies {

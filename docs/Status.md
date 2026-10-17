@@ -7,9 +7,11 @@ session. Keep it short — it earns its value by being short.
 
 - **Phase:** M6 (platforms and polish) nearly done: autosave/resume and touch tuning (1i); help
   screen, sound effects and app icons (1j) — all checked by the user on a Huawei P30, the icon
-  also in the macOS Dock. Left: performance measurement, the iOS ICU warning, desktop packaging.
-  Branch `master`; session 1j is uncommitted at close.
-- **Modules:** `core`, `composeApp`, `androidApp`, `iosApp` (Design §2.1). `core.map` generates
+  also in the macOS Dock. 1k added a **web target** (Kotlin/Wasm) and **GitHub Actions** for
+  tests and releases (Design §2.4). Left: performance measurement, the iOS ICU warning. Branch
+  `master`; session 1k is uncommitted at close. No git remote yet.
+- **Modules:** `core`, `composeApp`, `androidApp`, `iosApp` (Design §2.1); `core` and `composeApp`
+  also target `wasmJs` (browser app in `wasmJsMain`: `WebSaveStore`, `WebSpeaker`, `index.html`). `core.map` generates
   the map (Design §3); `core.rules` is setup, moves, fatigue, battle, growth, elimination
   (Design §4); `core.ai` has `HeuristicAi` with three personalities and three difficulties,
   `Simulation`, `PassiveAi`. The app opens on the new-game screen (map, seed, turn order, seats
@@ -19,8 +21,9 @@ session. Keep it short — it earns its value by being short.
   is saved after every action and offered as "Continue · round N" on launch (Design §7). How to
   play: seven tabs with looping scenes on real grid maps (§6.3). Sounds generated in code with
   volume and mute (§6.4). App icon drawn by the game for every platform (§8.1). 66 core tests
-  (64 common, plus JVM-only `ManySeedsTest` over 9000 maps and `TuningReport`); composeApp has
-  32: 9 snapshot, 4 play, 4 help, 5 sound, 4 icon, 2 picker, 2 touch, 2 save-store (~3 min).
+  (64 common — on JVM, Android host, iOS simulator and Wasm/Node — plus JVM-only
+  `ManySeedsTest` over 9000 maps and `TuningReport`); composeApp has 33: 9 snapshot, 4 play,
+  4 help, 5 sound, 5 icon, 2 picker, 2 touch, 2 save-store (~3 min).
 - **M1 verified:** 14 property tests over 34 maps (10 seeds × 3 presets, plus 6, 120, no-sea and
   70%-sea/all-features) pass on JVM, Android host and iOS simulator: exact province count,
   connected land, symmetric neighbours, shared border paths identical in both outlines, cells
@@ -35,7 +38,17 @@ session. Keep it short — it earns its value by being short.
   (Android, 2340×1080): readable, pan/pinch fine, kill-and-Continue works, 70-province and small
   maps; in 1j also the help screens, the sounds and the launcher icon. No physical iOS device
   yet; the iOS save path and iOS sound have only been compiled (the app builds with `xcodebuild`
-  and carries its icon), not run.
+  and carries its icon), not run. **Web:** the production build served locally, in Chrome on
+  macOS (by me, through the browser extension): renders, a move and an AI turn play, the save
+  lands in `localStorage` and reload offers Continue on the same board, a Clash buffer starts
+  with the `AudioContext` running (not heard), 120 fps. Not tried: Safari, Firefox, a phone
+  browser, the help screen on the web.
+- **CI:** `.github/workflows/ci.yml` and `release.yml` are written but **have never run** (no
+  GitHub repo yet). What they call was run locally: the CI test command passes; `packageDmg`
+  with `-Pkingdoms.version=1.2.3` gives `Kingdoms-1.2.3.dmg`; the APK carries versionCode 10203;
+  a release build signed with a throwaway keystore verifies with `apksigner`. Not run locally:
+  `packageDeb` (needs Linux) and the composeApp tests on Linux (fonts may differ; no test
+  compares pixels with text).
 - **Known warning:** the iOS link warns that Compose's bundled ICU data was built for iOS 18.5
   while the deployment target is 16.0. Harmless on the 18.2 simulator; check on an older iOS
   before release, or raise the target.
@@ -52,7 +65,7 @@ session. Keep it short — it earns its value by being short.
   the remaining two-player edge comes from more than starting growth. Under Fixed order the
   human's seat wins only 8–14% — hence §2.
 - **Toolchain:** Kotlin 2.4.21, Compose Multiplatform 1.12.2, AGP 9.4.1, Gradle 9.8.1, JDK 21,
-  Xcode 26.3, Android SDK at `~/Library/Android/sdk` (AGP installed platform 37 and build-tools
+  Xcode 26.3, the Wasm build fetches its own Node and Yarn through Gradle, Android SDK at `~/Library/Android/sdk` (AGP installed platform 37 and build-tools
   36.0.0 itself; `ANDROID_HOME` is not set — `local.properties` points at the SDK).
   kotlinx-serialization 1.11.0, kotlinx-io 0.9.1. **IntelliJ 2026.1 (and reportedly 2026.2)
   cannot import AGP 9.4.1** (supports up to 9.0 / 9.1); the user chose to keep AGP and build from
@@ -66,10 +79,15 @@ session. Keep it short — it earns its value by being short.
   screen). Compose 1.12 restarts `pointerInput` when its lambda changes, so stale tap handlers are
   ruled out. If it recurs: note the turn bar text, whether selection/targets showed, any log line,
   and the terminal output.
-- **Desktop packaging and the JDK:** `createDistributable`/`packageDmg` refuse the Homebrew JDK
-  (Compose checks the vendor). Either another JDK (e.g. Corretto) or
-  `compose.desktop.packaging.checkJdkVendor=false` in `gradle.properties` — the user's call. 1j
-  checked the bundle once with `-P…checkJdkVendor=false` on the command line; nothing changed.
+- **GitHub repo:** the user chose a new private GitHub repo; creating it and pushing is theirs.
+  Then: watch the first CI run, and push a test tag (e.g. `v1.0.0`) to see the release.
+- **Android signing key:** without the four `ANDROID_*` secrets (Design §2.4) releases carry a
+  debug APK that cannot update the previous one. The user makes the keystore (and must keep it:
+  a lost key means a new app for Play) and adds the secrets.
+- **Local desktop packaging and the JDK:** releases are packaged on CI with Temurin, so this only
+  matters locally: `packageDmg` refuses the Homebrew JDK. Another JDK or
+  `compose.desktop.packaging.checkJdkVendor=false` in `gradle.properties` — the user's call
+  (1k packaged with `-P…checkJdkVendor=false` on the command line).
 - Design §11 is empty.
 
 ## 3. To do next
@@ -96,12 +114,39 @@ In order; each milestone ends with something runnable on desktop.
   - [x] Sound effects (1j), checked on the P30.
   - [x] App icons (1j): Android, iOS, macOS, Linux, window — seen on the P30 and macOS Dock.
   - [ ] Real-device performance (the headless emulator renders in software; the P30 felt fine but
-        nothing was measured), the iOS ICU deployment warning, desktop packaging (§2).
+        nothing was measured), the iOS ICU deployment warning.
+  - [x] Web target (1k): Kotlin/Wasm, localStorage saves, Web Audio, favicon. Seen in Chrome.
+  - [x] Distributions (1k): CI on push, release on a `v*` tag (.dmg, .deb, APK, web zip).
+        Written and parts run locally; **first real run pending** the GitHub repo (§2).
+  - [ ] Optional: host the web build somewhere (GitHub Pages needs a public repo or a paid plan
+        for private ones), Safari/Firefox/phone-browser check, an Intel macOS build.
   - [ ] Optional: Android 13 monochrome (themed) icon layer; a defeat sound (not asked for).
 
 ## 4. Handover
 
 Latest first. Keep the last three sessions; condense older ones to a line under "Earlier".
+
+### 2026-10-17 — Session 1k: web target, CI and releases
+
+- User chose: web first, then CI; a new private GitHub repo; .dmg + .deb + APK + web zip; tests
+  on push, release on a tag. Design §2.4 (new), §6.4, §7, §8.1, §10; CLAUDE.md commands + 2 rules.
+- **Web:** `wasmJs` in `core` (tests in Node) and `composeApp` (`Main.kt` with `ComposeViewport`,
+  `WebSaveStore` on `localStorage`, `WebSpeaker` on Web Audio, `index.html` with a loading line).
+  No code in `commonMain` had to change: the save/speaker interfaces carried it. Favicon and
+  apple-touch icon from `AppIconTest.webIcons` (ran with `ICONS=1` for that test only; the other
+  platforms' icon files were not rewritten).
+- **Surprise:** 3 `SaveTest`s failed on Wasm — Kotlin/Wasm's `String.toDouble` is 1 bit off for
+  ~1 in 8000 numbers (no YouTrack issue found). Harmless for play (Design §7); the tests now
+  compare coordinates to 1e-12 and everything else exactly. Worth reporting to JetBrains.
+- **CI:** `ci.yml` (tests, snapshots kept 7 days) and `release.yml` (version from the tag; macOS
+  on `macos-latest`, so Apple silicon only; signed APK only with secrets). One app version in
+  `libs.versions.toml` (1.0.0 — Android was 0.1.0, but macOS needs major ≥ 1).
+- Choices without the user: Wasm only (no JS fallback for older browsers); macOS arm64 only;
+  debug APK when there are no secrets; snapshots uploaded from CI; a manual run of the release
+  workflow builds but never publishes. No tuning re-run needed (no rule, setup or AI change).
+- **Picking this up:** once the user has pushed to GitHub, check the first CI run (the Linux
+  composeApp tests are the unknown), then a test tag for the release. Then the open M6 items:
+  P30 performance, the iOS ICU warning.
 
 ### 2026-10-16/17 — Session 1j: help screen, sound effects, app icons
 
@@ -155,39 +200,12 @@ Latest first. Keep the last three sessions; condense older ones to a line under 
   tabs (rules / movement and attack / defence lines / tactics), then sound effects (§2 questions
   first). Optional, not asked for: a leader-focus for Normal AI.
 
-### 2026-10-15 — Session 1h: new-game screen, difficulty, a generator bug
-
-- New-game screen (`NewGameScreen.kt`, `Setup`) with seats: name, colour (8), You / AI
-  Easy-Normal-Hard; live map preview; random seed on launch. Menu (Resume, Restart, New game…)
-  and result panel (Play again, New game…). `NewGame.Seat`, `Kingdom.colour/difficulty`,
-  `Difficulty` in core; the app colours kingdoms through `GameState.colourOf`.
-- Difficulty in `HeuristicAi` measured: Easy 14%, Normal 23%, Hard 34% (one vs three Normal,
-  400 games); Normal unchanged. Now in the tuning report.
-- "Red usually wins": not the personality (rotations even) and, over 1000 games, not the seat
-  either (32/32/31%). The real effect is geography — the AI farthest from a player who fights
-  their neighbours wins ~48%. The user's games all started on seed 1 (fixed launch seed), where
-  red sits far away; the launch seed is now random. A leader-focused Normal AI would damp the
-  far-kingdom effect generally — not done; Hard has it.
-- Round 1 now puts people first, then the AIs in random order (harmless; it did not explain red).
-- Found while measuring: map generation crashed on 2 of 3000 Medium seeds (greedy vertex snap);
-  union-find made it transitive but mis-tiled ~2% of maps; a rounding-level snap fixed both
-  (0 failures in 9000 maps, no crossings in 1500). `ManySeedsTest` (core jvmTest, ~10 s) guards it.
-- User: "the menu is behind the map" on the new-game screen — dragging the preview drew the board
-  over the settings. `MapView` now clips to its bounds; `previewMapStaysBehindTheSettings` guards it.
-- User: banners, resources and castles stayed the same size when zooming — "scale with the map,
-  maybe at 50%"; and names when zoomed in. `markerScale`: the fitted view as before, then half the
-  map's zoom (clamped 0.4–2.5); names fade in from 120 to 160 dp province width, with a parchment
-  halo. Snapshots `zoom-*.png`.
-- User: "the last arrow of the enemy moves stays visible when it is the players turn". It was
-  cleared only when the player moved; now an AI's end of turn clears it.
-  `noEnemyArrowOnThePlayersTurn` compares the screen with a fresh render of the same state.
-- Not checked: pinch-zoom and the scaled markers/names on a real device; the leftover arrow was
-  reproduced only headless (a test), not in the user's window after the fix.
-- **Picking this up:** M6 — start with autosave/resume (the `onChange` hook is there), then
-  device touch tuning. Optional, not asked for: a leader-focus for Normal AI against the
-  far-kingdom effect.
-
 ### Earlier
+
+- **Session 1h:** new-game screen with seats, colours and difficulty (Easy 14 / Normal 23 / Hard
+  34%); "red usually wins" was geography plus a fixed launch seed (now random); a map-generation
+  crash on 2 of 3000 seeds fixed (`ManySeedsTest`); markers scale at half the zoom; names when
+  zoomed in.
 
 - **Session 1g (M5 HUD):** strength bars, turn panel, chronicle, province card, slider picker,
   generated province names, clash animation; camera in `CameraState` (taps were lost through

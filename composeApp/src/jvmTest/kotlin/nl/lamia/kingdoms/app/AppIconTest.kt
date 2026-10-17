@@ -94,6 +94,22 @@ class AppIconTest {
         }
     }
 
+    /** Web: the tab icon (the desktop tile) and Safari's home-screen icon (opaque; iOS rounds it itself). */
+    @Test
+    fun webIcons() {
+        val favicon = render(192) { macTile() }
+        val touch = render(180) { drawAppIcon(zoom = fullBleed) }
+        val pixels = Image.makeFromEncoded(touch).toComposeImageBitmap().toPixelMap()
+        for (y in 0 until 180 step 4) for (x in 0 until 180 step 4) assertEquals(1f, pixels[x, y].alpha, "transparent at $x,$y")
+        save("web-192.png", favicon)
+        save("web-touch-180.png", touch)
+        if (write) {
+            val dir = File(root, "composeApp/src/wasmJsMain/resources").apply { mkdirs() }
+            File(dir, "icon-192.png").writeBytes(favicon)
+            File(dir, "apple-touch-icon.png").writeBytes(touch)
+        }
+    }
+
     /** How the icon looks under the usual masks and at launcher sizes: look at `build/icons/preview.png`. */
     @Test
     fun preview() {

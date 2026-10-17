@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -21,6 +22,15 @@ kotlin {
             isStatic = true
         }
     }
+    // The browser app (Design §2.1): wasmJsBrowserDistribution → build/dist/wasmJs/productionExecutable.
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        outputModuleName.set("composeApp")
+        browser {
+            commonWebpackConfig { outputFileName = "composeApp.js" }
+        }
+        binaries.executable()
+    }
 
     sourceSets {
         commonMain.dependencies {
@@ -34,6 +44,7 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.compose.ui.test)
         }
+        wasmJsMain { languageSettings.optIn("kotlin.js.ExperimentalWasmJsInterop") }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
@@ -47,7 +58,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Deb)
             packageName = "Kingdoms"
-            packageVersion = "1.0.0"
+            packageVersion = providers.gradleProperty("kingdoms.version").getOrElse(libs.versions.kingdoms.get())
             // Rendered by AppIconTest (ICONS=1); Design §8.1.
             macOS { iconFile.set(project.file("icons/kingdoms.icns")) }
             linux { iconFile.set(project.file("icons/kingdoms.png")) }

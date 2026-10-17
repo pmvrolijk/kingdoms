@@ -26,7 +26,7 @@ Design constraints that every rule is measured against:
 | --- | --- |
 | Language | Kotlin Multiplatform |
 | UI | Compose Multiplatform |
-| Targets | Android, iOS, Desktop JVM (macOS, Linux) |
+| Targets | Android, iOS, Desktop JVM (macOS, Linux), Web (Kotlin/Wasm in the browser) |
 | Rendering | Compose `Canvas`, 2.5D projection (§8) — no 3D engine |
 | Serialization | kotlinx.serialization (save/resume) |
 | Package root | `nl.lamia.kingdoms` (also the Android application id and iOS bundle id) |
@@ -36,14 +36,16 @@ Design constraints that every rule is measured against:
 - **`core`** (`nl.lamia.kingdoms.core`, sub-packages `map`, `rules`, `ai`) — pure Kotlin, `commonMain` only, no UI or platform dependencies. Map generation,
   game state, rules, battle resolution, AI. Everything here is deterministic given a seed and is
   unit-tested in `commonTest`.
-- **`composeApp`** (`nl.lamia.kingdoms.app`) — rendering, input, HUD, screens; desktop `main` in `jvmMain`.
+- **`composeApp`** (`nl.lamia.kingdoms.app`) — rendering, input, HUD, screens; desktop `main` in `jvmMain`,
+  the browser's `main` in `wasmJsMain` (a `ComposeViewport` filling `index.html`, §2.4).
 - **`androidApp`** (`nl.lamia.kingdoms`) — the Android application module: one `MainActivity`
   that hosts `App()`. AGP 9 does not allow the Android application plugin in a KMP module, so
   `core` and `composeApp` are KMP Android *libraries* and this module is the app.
 - **`iosApp`** — the Xcode project: a SwiftUI shell hosting `MainViewController()` from the static
   `ComposeApp` framework, which an Xcode build phase builds through Gradle.
 
-Minimum platforms: Android 8.0 (API 26), iOS 16, desktop JVM 21.
+Minimum platforms: Android 8.0 (API 26), iOS 16, desktop JVM 21, and a browser with WebAssembly GC
+(Chrome/Edge 119, Firefox 120, Safari 18.2).
 
 `core` never depends on `composeApp`. The UI reads `GameState` and submits `Action`s; it never
 mutates state.
@@ -67,6 +69,34 @@ animate them.
 
 Each battle draws from `Random(mix(seed, draws))` and increments `draws`, so a state plus an
 action always yields the same next state, and the state stays a plain serializable value.
+
+### 2.4 Web, builds and releases
+
+Added 2026-10-17 (user: "support the web target", "distributions in a GitHub Action").
+
+- **Web.** `core` and `composeApp` have a `wasmJs` target; `core`'s common tests also run on Wasm,
+  in Node. The site is static: `index.html`, `composeApp.js` and two `.wasm` files, ~12 MB
+  (8.6 MB is Skia), from `wasmJsBrowserDistribution`; any static host serves it. Saves in
+  `localStorage` (§7), sound through Web Audio (§6.4), the icon as favicon (§8.1). Seen in Chrome
+  on macOS: renders, plays, saves, resumes, sounds start; 120 fps at 2× pixel density.
+- **Version.** One app version, `kingdoms` in `libs.versions.toml` (default 1.0.0), overridden
+  with `-Pkingdoms.version`. Desktop packages use it; Android uses it as `versionName` and derives
+  `versionCode` = major·10000 + minor·100 + patch. macOS packaging needs major ≥ 1.
+- **CI** (`.github/workflows/ci.yml`, GitHub, decided by the user: tests on push, release on a
+  tag): every push and pull request runs `core` on JVM and Wasm and the `composeApp` JVM tests on
+  Linux, and keeps the snapshots for a week.
+- **Release** (`release.yml`): a tag `vX.Y.Z` runs CI, then builds with that version and
+  publishes a GitHub Release with `Kingdoms-X.Y.Z.dmg` (macOS, Apple silicon, unsigned: Gatekeeper
+  asks on first open), `kingdoms_X.Y.Z-1_amd64.deb` (Linux), `Kingdoms-X.Y.Z.apk` and
+  `Kingdoms-X.Y.Z-web.zip`. Started by hand from the Actions tab, it builds the same files as
+  downloads on the run, with the default version, and publishes nothing. CI uses Temurin 21, so
+  Compose's JDK-vendor check passes there.
+- **Android signing.** With the repository secrets `ANDROID_KEYSTORE_BASE64`,
+  `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` the APK is a signed
+  release build (the build reads `KINGDOMS_KEYSTORE*`/`KINGDOMS_KEY_*` from the environment);
+  without them it is a debug APK, `Kingdoms-X.Y.Z-debug.apk`, signed with that runner's throwaway
+  key, so it cannot update an earlier one in place.
+- Not built: iOS (needs an Apple developer account and signing secrets), a Windows package.
 
 ## 3. The map
 
@@ -415,7 +445,9 @@ from reference recordings the user chose (only measured, nothing from them ships
 - **Playback** is per platform behind `Speaker`, passed into `App` like the save store: desktop
   `javax.sound` clips opened on a background thread (no device: silent after one message),
   Android `SoundPool` from WAVs written to the cache at launch, iOS `AVAudioPlayer` (two per
-  sound, so a quick repeat overlaps).
+  sound, so a quick repeat overlaps), the browser Web Audio (`WebSpeaker`: a buffer per variant,
+  rendered on first use, played through a gain node). Browsers allow audio only after the
+  player's first tap, so the `AudioContext` is made on the first sound, which is always a click.
 
 ## 7. Save and resume
 
@@ -432,9 +464,15 @@ button on the new-game screen rather than launching straight into the game.
 - **Size:** 150 KB (Small) to 300 KB (Large); encoding under 1 ms, decoding ~3 ms on desktop.
 - **Where:** `save.json` — desktop `~/Library/Application Support/Kingdoms` (macOS) or
   `$XDG_DATA_HOME/kingdoms` (Linux, default `~/.local/share`); Android the app's `filesDir`; iOS
-  Application Support. Written to `save.json.tmp` and renamed, so a crash mid-write keeps the old
-  save. A save that does not parse or fails validation is treated as no save; a failed write
+  Application Support; the browser `localStorage` under `kingdoms.save` and `kingdoms.settings`,
+  per site and browser (a browser that blocks storage plays without saving). Written to
+  `save.json.tmp` and renamed, so a crash mid-write keeps the old save. A save that does not parse or fails validation is treated as no save; a failed write
   loses the save but does not stop play.
+- **Wasm and numbers.** Kotlin/Wasm's `String.toDouble` (2.4.21) puts about 1 in 8000 numbers one
+  bit off (the JVM: none in 200 000), so a save loaded in the browser can move a map coordinate
+  by ~1e-13. Rules and AI never read coordinates, and a border point shared by two outlines is
+  parsed the same way in both, so play is unchanged; `SaveTest` compares everything else exactly
+  and coordinates to 1e-12.
 - Not saved: the chronicle, the last AI arrow, the camera, the selection.
 
 ## 8. Visual style
@@ -488,7 +526,8 @@ noise at launcher size. The hexagon's sides have a slight seeded wobble, like th
   background and land foreground as PNGs per density, `mipmap-anydpi-v26/ic_launcher.xml`;
   minSdk 26, so no legacy icon); iOS one opaque 1024 px image in `Assets.xcassets`; macOS
   `composeApp/icons/kingdoms.icns` (a rounded tile, 824 of 1024, via `iconutil`) and Linux
-  `kingdoms.png`. The desktop window draws the icon live (`AppIconPainter`).
+  `kingdoms.png`; web `icon-192.png` (the tile, as favicon) and an opaque `apple-touch-icon.png`
+  in `wasmJsMain/resources`. The desktop window draws the icon live (`AppIconPainter`).
 - The test checks that the iOS icon is opaque and shows the player's colour, and that no pixel of
   the Android foreground lies outside the safe circle; `build/icons/preview.png` shows it under
   the masks at 192, 96 and 48 px. No Android 13 monochrome layer yet.
@@ -510,7 +549,9 @@ Guidelines, not rules — the game itself has no round or time limit.
   many seeds and every size preset — exact land province count, every land province reachable, every border shared by exactly two provinces with identical
   polylines, no self-intersecting outlines.
 - Simulation tests for §9.
-- UI: manual run on desktop each session; Android and iOS checked at each milestone.
+- `core`'s common tests run on JVM, Android host, iOS simulator and Wasm (Node); CI runs JVM and
+  Wasm on every push (§2.4).
+- UI: manual run on desktop each session; Android, iOS and the browser checked at each milestone.
 
 ## 11. Open questions
 

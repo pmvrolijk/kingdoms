@@ -1,4 +1,7 @@
 [versions]
+# The app's own version; a release tag vX.Y.Z overrides it with -Pkingdoms.version (Design §2.4).
+# macOS packaging needs X >= 1.
+kingdoms = "1.0.0"
 kotlin = "2.4.21"
 compose-multiplatform = "1.12.2"
 agp = "9.4.1"

@@ -1,0 +1,152 @@
+# Builds the distributions (Design §2.4). A tag vX.Y.Z publishes them as a GitHub Release with that
+# version; starting it by hand from the Actions tab only builds them, as downloads on the run.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: v
+        name: Version from the tag, else the default in libs.versions.toml
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version=$(sed -nE 's/^kingdoms = "(.*)"/\1/p' gradle/libs.versions.toml)
+          fi
+          if ! [[ "$version" =~ ^[1-9][0-9]*\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version '$version' must be X.Y.Z with X >= 1 (macOS packaging needs it)"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  macos:
+    needs: [test, version]
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+      - run: ./gradlew :composeApp:packageDmg -Pkingdoms.version=${{ needs.version.outputs.version }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-macos
+          path: composeApp/build/compose/binaries/main/dmg/*.dmg
+          if-no-files-found: error
+
+  linux:
+    needs: [test, version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+      - run: ./gradlew :composeApp:packageDeb -Pkingdoms.version=${{ needs.version.outputs.version }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-linux
+          path: composeApp/build/compose/binaries/main/deb/*.deb
+          if-no-files-found: error
+
+  android:
+    needs: [test, version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      KINGDOMS_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      KINGDOMS_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      KINGDOMS_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Signed release APK, or a debug APK without the signing secrets
+        run: |
+          mkdir -p out
+          if [[ -n "$KEYSTORE_BASE64" ]]; then
+            export KINGDOMS_KEYSTORE="$RUNNER_TEMP/kingdoms.jks"
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$KINGDOMS_KEYSTORE"
+            ./gradlew :androidApp:assembleRelease -Pkingdoms.version="$VERSION"
+            cp androidApp/build/outputs/apk/release/androidApp-release.apk "out/Kingdoms-$VERSION.apk"
+          else
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret: building a debug APK"
+            ./gradlew :androidApp:assembleDebug -Pkingdoms.version="$VERSION"
+            cp androidApp/build/outputs/apk/debug/androidApp-debug.apk "out/Kingdoms-$VERSION-debug.apk"
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-android
+          path: out/*.apk
+          if-no-files-found: error
+
+  web:
+    needs: [test, version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+      - run: ./gradlew :composeApp:wasmJsBrowserDistribution
+      - name: Zip the site
+        run: |
+          mkdir -p out
+          cd composeApp/build/dist/wasmJs/productionExecutable
+          zip -r "$GITHUB_WORKSPACE/out/Kingdoms-${{ needs.version.outputs.version }}-web.zip" .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-web
+          path: out/*.zip
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [version, macos, linux, android, web]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          pattern: dist-*
+          merge-multiple: true
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la dist
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Kingdoms ${{ needs.version.outputs.version }}" \
+            --generate-notes
