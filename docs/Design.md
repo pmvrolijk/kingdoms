@@ -87,8 +87,9 @@ Added 2026-10-17 (user: "support the web target", "distributions in a GitHub Act
   Linux, and keeps the snapshots for a week.
 - **Release** (`release.yml`): a tag `vX.Y.Z` runs CI, then builds with that version and
   publishes a GitHub Release with `Kingdoms-X.Y.Z.dmg` (macOS, Apple silicon, unsigned: Gatekeeper
-  asks on first open), `kingdoms_X.Y.Z-1_amd64.deb` (Linux), `Kingdoms-X.Y.Z.apk` and
-  `Kingdoms-X.Y.Z-web.zip`. Started by hand from the Actions tab, it builds the same files as
+  asks on first open), `kingdoms_X.Y.Z_amd64.deb` (Linux), `Kingdoms-X.Y.Z.apk` and
+  `Kingdoms-X.Y.Z-web.zip`; a release already made on GitHub's release page for that tag gets the
+  files added instead. Started by hand from the Actions tab, it builds the same files as
   downloads on the run, with the default version, and publishes nothing. CI uses Temurin 21, so
   Compose's JDK-vendor check passes there.
 - **Local packaging** needs a JDK Compose accepts (e.g. Temurin as `JAVA_HOME`; the Homebrew JDK

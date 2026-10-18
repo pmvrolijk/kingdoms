@@ -46,9 +46,9 @@ session. Keep it short — it earns its value by being short.
   with the `AudioContext` running (not heard), 120 fps. The built site in
   `composeApp/build/dist` predates pacts until rebuilt. Not tried: Safari, Firefox, a phone
   browser, the help screen on the web.
-- **CI:** `.github/workflows/ci.yml` and `release.yml`. The repo is on GitHub since 1l; the first
-  CI run failed 5 slow UI tests on a timeout (fixed in 1l, not yet re-run); `release.yml` has
-  not run. What they call was run locally: the CI test command passes; `packageDmg`
+- **CI:** `.github/workflows/ci.yml` and `release.yml`. The repo is on GitHub since 1l. CI is
+  green after the 1l timeout fix. The release built every file for v1.0.1 but failed to publish
+  (fixed in 1l, not yet re-run). What they call was run locally: the CI test command passes; `packageDmg`
   with `-Pkingdoms.version=1.2.3` gives `Kingdoms-1.2.3.dmg`; the APK carries versionCode 10203;
   a release build signed with a throwaway keystore verifies with `apksigner`. Not run locally:
   `packageDeb` (needs Linux) and the composeApp tests on Linux (fonts may differ; no test
@@ -152,7 +152,11 @@ Latest first. Keep the last three sessions; condense older ones to a line under 
 - **Android signing:** the user made a self-signed keystore (kept in the git-ignored `local/`)
   and added the four secrets to the GitHub environment `prod`; the android job now names
   `environment: prod` (environment secrets are invisible otherwise). `*.jks`/`*.keystore`
-  git-ignored. Not yet run: the first tag will show whether the signed APK builds.
+  git-ignored. The user restricted `prod` to `v*` tags, so a manual release run's android job fails.
+- **First release, v1.0.1:** CI green; all four files built (signed `Kingdoms-1.0.1.apk`, 7 MB;
+  .dmg 69 MB; `kingdoms_1.0.1_amd64.deb` 53 MB — no `-1`, Design fixed; web zip 4.5 MB). The
+  publish step failed: the release already existed (made on GitHub's release page, which also
+  makes the tag). It now uploads to an existing release, or creates one. Not yet re-run.
 - Choices without the user: About in the settings footer, not the header (it was clipped on a
   phone); British "Licence" on the chip, matching the game's English; no screenshot in the
   README; the Source code link points at the private repo, so it 404s for others until the repo

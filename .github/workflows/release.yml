@@ -143,12 +143,18 @@ jobs:
           path: dist
           pattern: dist-*
           merge-multiple: true
+      # A release made on GitHub's "Draft a new release" page already exists when this runs (making
+      # it created the tag): add the files to it. A pushed tag has none yet: create it.
       - name: Publish the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -la dist
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Kingdoms ${{ needs.version.outputs.version }}" \
-            --generate-notes
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Kingdoms ${{ needs.version.outputs.version }}" \
+              --generate-notes
+          fi
