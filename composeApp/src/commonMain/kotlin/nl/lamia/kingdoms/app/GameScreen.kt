@@ -203,7 +203,8 @@ private fun GameOver(game: GameState, onPlayAgain: () -> Unit, onNewGame: () -> 
     val winner = game.winner
     val human = game.kingdoms.firstOrNull { it.human }
     val title = when {
-        winner != null && winner == human?.id -> "Victory!"
+        winner != null && game.kingdoms[winner].human && game.hotSeat -> "Victory for ${game.kingdoms[winner].name}!"
+        winner != null && game.kingdoms[winner].human -> "Victory!"
         winner != null -> "${game.kingdoms[winner].name} wins"
         else -> "Defeat"
     }

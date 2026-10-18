@@ -40,7 +40,7 @@ import nl.lamia.kingdoms.core.rules.NewGame
 import nl.lamia.kingdoms.core.rules.TurnOrder
 import kotlin.random.Random
 
-/** Everything a new game is made from (Design §6.2). The first seat is the player. */
+/** Everything a new game is made from (Design §6.2). One or more seats are people, playing hot-seat. */
 @Serializable
 data class Setup(
     val landProvinces: Int = MapSize.Medium.landProvinces,
@@ -80,7 +80,7 @@ fun NewGameScreen(
     Row(modifier.background(Palette.Sea)) {
         // Settings scroll; Start stays pinned under them, so it is always on screen (phones).
         // The insets go outside the width: a camera cutout must not narrow the panel.
-        Column(Modifier.safeDrawingPadding().padding(12.dp).width(356.dp).panel()) {
+        Column(Modifier.safeDrawingPadding().padding(12.dp).width(396.dp).panel()) {
           Column(
             Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -132,6 +132,8 @@ fun NewGameScreen(
                 setup.seats.forEachIndexed { i, seat ->
                     SeatRow(
                         seat,
+                        // A game needs someone at the table: the last person cannot become an AI.
+                        lastPerson = seat.human && setup.seats.count { it.human } == 1,
                         canRemove = i > 0 && setup.seats.size > NewGame.MIN_KINGDOMS,
                         onChange = { changed -> onChange(setup.copy(seats = setup.seats.toMutableList().also { it[i] = changed })) },
                         onNextColour = {
@@ -209,9 +211,9 @@ private fun Section(title: String, content: @Composable () -> Unit) {
     }
 }
 
-/** A kingdom: colour (tap to change), name (editable), and who plays it. */
+/** A kingdom: colour (tap to change), name (editable), and who plays it: a person or an AI of some difficulty. */
 @Composable
-private fun SeatRow(seat: NewGame.Seat, canRemove: Boolean, onChange: (NewGame.Seat) -> Unit, onNextColour: () -> Unit, onRemove: () -> Unit) {
+private fun SeatRow(seat: NewGame.Seat, lastPerson: Boolean, canRemove: Boolean, onChange: (NewGame.Seat) -> Unit, onNextColour: () -> Unit, onRemove: () -> Unit) {
     val colour = Palette.kingdom(seat.colour)
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
@@ -230,11 +232,10 @@ private fun SeatRow(seat: NewGame.Seat, canRemove: Boolean, onChange: (NewGame.S
             modifier = Modifier.weight(1f, fill = false).width(110.dp)
                 .background(Palette.Selected, RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 3.dp),
         )
-        if (seat.human) {
-            BasicText("You", style = Small.copy(fontWeight = FontWeight.Bold), modifier = Modifier.padding(horizontal = 6.dp))
-        } else {
-            for (d in Difficulty.entries) {
-                Chip(d.name, active = d == seat.difficulty, small = true) { onChange(seat.copy(difficulty = d)) }
+        Chip("Human", active = seat.human, small = true) { onChange(seat.copy(human = true)) }
+        for (d in Difficulty.entries) {
+            Chip(d.name, active = !seat.human && d == seat.difficulty, enabled = !lastPerson, small = true) {
+                onChange(seat.copy(human = false, difficulty = d))
             }
         }
         if (canRemove) BasicText("×", style = Label.copy(fontSize = 18.sp), modifier = Modifier.clickable(onClick = onRemove).padding(4.dp))

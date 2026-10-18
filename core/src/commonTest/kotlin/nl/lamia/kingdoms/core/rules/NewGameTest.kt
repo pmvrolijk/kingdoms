@@ -100,6 +100,41 @@ class NewGameTest {
     }
 
     @Test
+    fun hotSeatDrawsWhichPersonGoesFirstThenTheOthersBySeatThenTheAis() {
+        val seats = NewGame.seats(5, humans = setOf(0, 2, 3))
+        val firsts = (1L..40L).map { seed ->
+            val game = NewGame.create(Fixtures.map, seats, seed = seed)
+            val people = game.order.take(3)
+            assertEquals(listOf(0, 2, 3), people.sorted(), "seed $seed: ${game.order}")
+            // The others follow the first in seat order, wrapping round.
+            assertTrue(people in listOf(listOf(0, 2, 3), listOf(2, 3, 0), listOf(3, 0, 2)), "seed $seed: $people")
+            assertEquals(game.order.first(), game.current)
+            game.provincesOf(game.current).forEach { assertEquals(game.holdings[it].armies, game.holdings[it].fresh) }
+            game.order.first()
+        }
+        assertEquals(setOf(0, 2, 3), firsts.toSet(), "every person goes first for some seed")
+    }
+
+    @Test
+    fun underFixedOrderRoundOnesOrderHoldsAllGame() {
+        val game = NewGame.create(Fixtures.map, NewGame.seats(4, humans = setOf(1, 3)), seed = 7, turnOrder = TurnOrder.Fixed)
+        var state = game
+        while (state.round < 3) state = (Rules.apply(state, Action.EndTurn) as Outcome.Applied).state
+        assertEquals(game.order, state.order)
+        assertEquals(game.order.first(), state.current)
+    }
+
+    @Test
+    fun onePersonDrawsNothingSoSeedsSetUpAsBefore() {
+        // Pinned before hot-seat (session 1m): a draw for one person would shift every later random
+        // number, and old seeds would start differently.
+        val game = NewGame.create(MapGenerator.generate(MapConfig.of(MapSize.Medium, seed = 5)), kingdoms = 4, seed = 5)
+        assertEquals(listOf(0, 1, 2, 3), game.order)
+        assertEquals(listOf(22, 20, 11, 6), game.kingdoms.map { it.capital })
+        assertEquals(listOf(3, 2, 2, 3, 3, 1, 3, 3, 2, 1, 2, 3, 3, 1, 3, 3), game.holdings.filter { it.owner == null }.map { it.armies })
+    }
+
+    @Test
     fun sameSeedSameSetup() {
         val map = Fixtures.map
         assertEquals(NewGame.create(map, 4, seed = 9), NewGame.create(map, 4, seed = 9))

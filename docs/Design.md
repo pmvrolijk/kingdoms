@@ -220,8 +220,10 @@ count matches.
 ### 4.1 Setup
 
 - 2–6 kingdoms; default 4 (player + 3 AI), set up as **seats** on the new-game screen: each has
-  a name, a colour (from eight) and either a person or an AI difficulty (§5). The first seat is
-  the player.
+  a name, a colour (from eight) and either a person or an AI difficulty (§5). By default the first
+  seat is the player. **Hot-seat** (added 2026-10-18, user: "allow more human players, local
+  hot-seat only"): any number of seats may be people, sharing one screen; at least one is. There
+  is no hand-over screen: the board holds no secrets.
 - Each kingdom starts with a **capital** and two neighbouring provinces. The setup tries 80
   candidate layouts — farthest-point capitals over graph distance from a random first pick, one
   refinement pass, then starting neighbours claimed in passes where the poorest kingdom picks
@@ -245,12 +247,14 @@ count matches.
 ### 4.2 Round and turn
 
 A **round** is every living kingdom taking one turn. In round 1 people move first, then the AIs
-— in random order under Shuffled, by seat otherwise. From round 2 the order follows the game's
-`TurnOrder`, **Shuffled** by default:
+— in random order under Shuffled, by seat otherwise. With several people (user's rule), one is
+drawn from the game seed to go first and the others follow in seat order after them, wrapping
+round; with one person nothing is drawn, so a seed sets up the same game as before hot-seat. From
+round 2 the order follows the game's `TurnOrder`, **Shuffled** by default:
 
 | TurnOrder | Order each round |
 | --- | --- |
-| Fixed | By kingdom id, every round |
+| Fixed | Round 1's order, every round |
 | Rotating | The starting kingdom moves one seat each round |
 | Shuffled | A fresh random order each round, from the game seed. With two kingdoms left they alternate: the one that did not just move goes first, so neither gets a double turn |
 
@@ -405,10 +409,11 @@ The map fills the screen; the HUD sits in the corners on parchment panels.
 
 - **Top left — kingdom strength.** Three 100% stacked bars, one segment per living kingdom in
   its colour: *production* (growth per round), *territory* (provinces), *armies* (total). The
-  player's segment is outlined and the player's own value is printed at the end of each bar.
+  player's segment is outlined and the player's own value is printed at the end of each bar. In
+  hot-seat that is the person to move, or during AI turns the next person in the round's order.
 - **Top right — turn.** Round number; this round's turn order as coloured dots, the current
   kingdom enlarged; the pact in force as one line, "Pact: A, B and C against D" (§4.7); whose move it is (an AI
-  shows its personality); **End turn** on the player's
+  shows its personality; in hot-seat a person's turn reads "Aldmere, your turn"); **End turn** on the player's
   turn, **Skip** during AI turns; a Menu button. Under it, a short **chronicle** of the last
   three events, told with names: "Aldmere takes Thornwick from Brightvale", "Brightvale is
   defeated at Millbrook", "Dunmoor falls to Aldmere", and pacts forming, ending and broken — kingdom names in their colours, the
@@ -442,8 +447,8 @@ The map fills the screen; the HUD sits in the corners on parchment panels.
 
 - **New game** (also the title screen): on the left the settings — map size (presets and ±2
   provinces), seed (editable, Shuffle for a new one; random on launch), turn order, and the
-  kingdoms: colour swatch (tap for the next unused colour), editable name, *You* or an AI
-  difficulty, remove; Add a kingdom up to six; **Start** stays pinned at the bottom. On the right a
+  kingdoms: colour swatch (tap for the next unused colour), editable name, *Human* or an AI
+  difficulty (Easy, Normal, Hard; greyed out on the only person's seat), remove; Add a kingdom up to six; **Start** stays pinned at the bottom. On the right a
   live preview of the actual map with each kingdom's starting territory in its colour. The
   settings end with the copyright line and an About chip (§6.5). Start is
   disabled, with a reason, when the map is too small for the kingdoms. With a saved game,
@@ -452,7 +457,8 @@ The map fills the screen; the HUD sits in the corners on parchment panels.
 - **Menu** (in game): Resume, How to play, Restart (same setup, new game seed), New game…, the
   sound control (§6.4), and the seed with an About chip (§6.5). AI turns wait while the menu, help
   or About is open.
-- **Result**: Victory / Defeat / "X wins" in the winner's colour, rounds played, Play again,
+- **Result**: Victory (in hot-seat "Victory for X!") / Defeat when every person is out / "X wins"
+  in the winner's colour, rounds played, Play again,
   New game….
 
 ### 6.3 Help

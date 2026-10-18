@@ -9,9 +9,11 @@ session. Keep it short — it earns its value by being short.
   screen, sound effects and app icons (1j) — all checked by the user on a Huawei P30, the icon
   also in the macOS Dock. 1k added a **web target** (Kotlin/Wasm) and **GitHub Actions** for
   tests and releases (Design §2.4), and **pacts** against a runaway leader (§4.7), played by the
-  user on desktop. Left: performance measurement, the iOS ICU warning. Branch `master`, pushed to
-  GitHub (`origin`, private) since 1l. **First release: v1.0.2** (1l), the dmg and APK installed
-  and played by the user.
+  user on desktop. Left: performance measurement, the iOS ICU warning. Branch `master` on GitHub
+  (`origin`), **public** since 1m. **First release: v1.0.2** (1l), the dmg and APK installed
+  and played by the user. 1m: CI badge and screenshots in the README, the web build deployed to
+  GitHub Pages on each release tag (Design §2.4), and **hot-seat** — several people at one screen
+  (§4.1, §4.2), played by the user on desktop with only people.
 - **Modules:** `core`, `composeApp`, `androidApp`, `iosApp` (Design §2.1); `core` and `composeApp`
   also target `wasmJs` (browser app in `wasmJsMain`: `WebSaveStore`, `WebSpeaker`, `index.html`). `core.map` generates
   the map (Design §3); `core.rules` is setup, moves, fatigue, battle, growth, elimination
@@ -23,9 +25,10 @@ session. Keep it short — it earns its value by being short.
   is saved after every action and offered as "Continue · round N" on launch (Design §7). How to
   play: seven tabs with looping scenes on real grid maps (§6.3). Sounds generated in code with
   volume and mute (§6.4). App icon drawn by the game for every platform (§8.1). Pacts against a
-  runaway leader and a hinterland-first setup (§4.1, §4.7). 79 core tests (77 common — on JVM,
-  Android host, iOS simulator and Wasm/Node — plus JVM-only `ManySeedsTest` over 9000 maps and
-  `TuningReport`); composeApp has 37: 10 snapshot, 4 play, 4 help, 5 sound, 5 icon, 3 about, 2 picker,
+  runaway leader and a hinterland-first setup (§4.1, §4.7). Any seat can be a person (hot-seat).
+  82 core tests (80 common — on JVM and Wasm/Node in 1m; Android host and iOS simulator not re-run
+  since 1l — plus JVM-only `ManySeedsTest` over 9000 maps and `TuningReport`); composeApp has 42:
+  10 snapshot, 4 play, 4 help, 5 sound, 5 icon, 3 about, 3 hot-seat, 2 screenshot, 2 picker,
   2 touch, 2 save-store (~3 min).
 - **M1 verified:** 14 property tests over 34 maps (10 seeds × 3 presets, plus 6, 120, no-sea and
   70%-sea/all-features) pass on JVM, Android host and iOS simulator: exact province count,
@@ -51,7 +54,9 @@ session. Keep it short — it earns its value by being short.
   published a release with all four files; the user installed the signed APK (P30) and the
   .dmg (macOS) and both work. **Not tried:** the `.deb` on a Linux machine, the web zip served
   from the release. The v1.0.1 tag/release failed to publish (fixed in v1.0.2); tags `v0.9.0`
-  and `v1.0.0` also exist on GitHub, from before signing.
+  and `v1.0.0` also exist on GitHub, from before signing. **Pages:** the `pages` job in
+  `release.yml` has not run yet; the user set up Pages and the `github-pages` environment and will
+  check the deploy with the next release. Until then the README's "Play in your browser" link 404s.
 - **Known warning:** the iOS link warns that Compose's bundled ICU data was built for iOS 18.5
   while the deployment target is 16.0. Harmless on the 18.2 simulator; check on an older iOS
   before release, or raise the target.
@@ -82,9 +87,9 @@ session. Keep it short — it earns its value by being short.
   screen). Compose 1.12 restarts `pointerInput` when its lambda changes, so stale tap handlers are
   ruled out. If it recurs: note the turn bar text, whether selection/targets showed, any log line,
   and the terminal output.
-- **Going public:** the user will make the repo public. Until then the About panel's Source code
-  link and the README's Releases link 404 for anyone else. Optionally tidy the failed v1.0.1
-  release and the early `v0.9.0`/`v1.0.0` tags first.
+- **Hot-seat hand-over:** there is no "Pass to X" pause between people; the turn panel's name is the
+  cue (the board holds no secrets). Add one only if play shows it is needed. Optionally tidy the
+  failed v1.0.1 release and the early `v0.9.0`/`v1.0.0` tags.
 - **Pact strength:** in play the user won a game the pact stood against (round 15) and lost one
   where the pact failed against red; fine so far. If people keep beating pacts easily, the
   levers are the AI's +3 on the target and the 35% trigger (both measurable in the report).
@@ -120,8 +125,9 @@ In order; each milestone ends with something runnable on desktop.
   - [x] Distributions (1k, 1l): CI on push, release on a `v*` tag (.dmg, .deb, APK, web zip).
         First release v1.0.2; dmg and signed APK checked by the user. .deb and web zip untried.
   - [x] Licence (AGPL-3.0-or-later), README, About panel (1l).
-  - [ ] Optional: host the web build somewhere (GitHub Pages needs a public repo or a paid plan
-        for private ones), Safari/Firefox/phone-browser check, an Intel macOS build.
+  - [x] Host the web build (1m): GitHub Pages on each release tag. First deploy pending (§1).
+  - [ ] Optional: Safari/Firefox/phone-browser check, an Intel macOS build.
+  - [x] Hot-seat (1m): several people at one screen; played by the user on desktop, people only.
   - [ ] Optional: Android 13 monochrome (themed) icon layer; a defeat sound (not asked for).
   - [x] Balance against runaway leaders (1k): pacts on Normal and Hard (35%/28%), hinterland-first
         setup; a pact ends below two members, a breaker sits out 3 rounds. Growth caps and upkeep
@@ -133,6 +139,34 @@ In order; each milestone ends with something runnable on desktop.
 ## 4. Handover
 
 Latest first. Keep the last three sessions; condense older ones to a line under "Earlier".
+
+### 2026-10-18 — Session 1m: public repo, Pages, screenshots, hot-seat
+
+- The user made the repo public. **README:** CI badge, a "Play in your browser" link, three
+  screenshots. **Pages** (user: on each release tag): the web job also uploads the site as a Pages
+  artifact, a `pages` job deploys it (`deploy-pages@v5`; also on a manual run). I served the build
+  under `/kingdoms/` locally and loaded it in Chrome: it renders, every request 200. The user set
+  up Pages (source "GitHub Actions") and the environment; not yet deployed.
+- **Screenshots** from `ScreenshotTest` (CLAUDE.md command): seed 51, played by the AI to round 6
+  so the chronicle fills; the attack target skips pact allies (seed 1's only targets were allies,
+  so the chronicle said "breaks the pact" — 60 seeds searched). The clash frame needs a frame at
+  +150 ms before it, or the animation starts late. Re-renders differ by a few bytes: the water runs
+  on real time.
+- **Hot-seat** (user's idea and turn rule): any seat can be Human; round 1 draws which person goes
+  first, the others follow by seat, then the AIs. One person draws nothing — a test pins seed 5's
+  setup, matched against the old code — so old seeds, saves and the tuning numbers are unchanged
+  (no tuning re-run). App: Human/Easy/Normal/Hard chips (the only person's AI chips greyed out),
+  "Aldmere, your turn", strength bars follow the person to move, "Victory for X!".
+  `HotSeatTest` (3). The user played a people-only game on desktop to a win and liked the
+  coloured turn dots.
+- Choices without the user: no hand-over screen (§2); the settings panel 356 → 396 dp, since the
+  extra chip cut the names ("Bright…"), checked in the P30 snapshot; the other people follow the
+  drawn one in seat order (not shuffled).
+- Not checked: hot-seat on Android/iOS/web (compiled for web and Android, not run; iOS not
+  compiled), the core tests on the Android host and iOS simulator.
+- **Picking this up:** the user tags a release; check that the `pages` job deployed and the game
+  plays at https://pmvrolijk.github.io/kingdoms/ (also Safari/Firefox/phone if at hand). Then the
+  open M6 items: performance on the P30, the iOS ICU warning.
 
 ### 2026-10-18 — Session 1l: first CI run, licence, first release
 
@@ -231,33 +265,10 @@ Latest first. Keep the last three sessions; condense older ones to a line under 
   (§2); otherwise the open M6 items: P30 performance, the iOS ICU warning. Rebuild the web app
   before anyone plays it in a browser.
 
-### 2026-10-16/17 — Session 1j: help screen, sound effects, app icons
-
-- **Help** (user: tabs, a scene each for Goal, Moving, Attack, Strength, Borders, Growth, plus
-  Tactics as text): scenes are real maps — `core.map.GridMap` builds small grids with the
-  generator's edges, tested with the other maps — drawn by `MapView` with gestures off, with
-  taps, marching shields and growth overlaid; numbers come from `Battle`. Found on the way: a
-  river under the selection outline was hidden (fixed for the real game too); the AI kept
-  playing behind the menu (now waits while menu or help is open).
-- **Sound** (user: generated in code with variation; volume and mute; "be nice"): `Synth`
-  renders Click, Clash, March, Victory; `Speaker` per platform (`JvmSpeaker`, `AndroidSpeaker`
-  with SoundPool, `IosSpeaker` with the Ambient session). Iterated by ear with the user: the
-  clash rang like a bell, then was rebuilt from a sword recording the user gave; the march went
-  from a white-noise slide to two gravelly grey-noise steps at ~0.42 s, ~5 dB under the rest, and
-  a march never overlaps another. Recordings were only measured (one is CC BY): nothing ships.
-  I cannot hear; levels were set by measurement, the judging was the user's.
-- **Icons** (user: the player's forest capital, roughly hexagonal): `AppIcon.kt` with the map's
-  pieces; `AppIconTest` checks the Android safe circle and iOS opacity, and with `ICONS=1`
-  writes all platform files (CLAUDE.md §Commands). Seen on the P30 launcher and the macOS Dock.
-- Choices without the user: no army count on the icon; help scenes silent; AI sounds at 60%;
-  sound settings in `settings.json`; volume default 6/10 with amplitude (v/10)².
-- No tuning re-run needed (no rule, setup or AI change).
-- **Picking this up:** ask the user what follows M6. Open M6 items: measure performance on the
-  P30, the iOS ICU warning (raise the target or check an older iOS), the desktop packaging JDK
-  (§2), and a first run on a physical iOS device if one is available.
-
 ### Earlier
 
+- **Session 1j:** help screen (seven tabs, scenes on real grid maps), sound effects generated in
+  code (`Synth`, per-platform `Speaker`, tuned by ear with the user), app icons drawn by the game.
 - **Session 1i:** autosave/resume (GameState snapshot, Continue button), touch tuning on the P30
   (relative zoom limits, near-miss taps), Android text-halo fix (`drawStyle = Fill`).
 - **Session 1h:** new-game screen with seats, colours and difficulty (Easy 14 / Normal 23 / Hard

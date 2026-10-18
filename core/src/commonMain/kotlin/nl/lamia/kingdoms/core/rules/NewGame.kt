@@ -74,9 +74,13 @@ object NewGame {
         // Seats are shuffled over the territories, so turn order says nothing about map position.
         val seat = (0 until kingdoms).shuffled(random)
         val capitals = (0 until kingdoms).map { k -> best.capitals[seat.indexOf(k)] }
-        // Round 1: people first (by seat), then the AIs — shuffled under Shuffled order, so no AI is
-        // always the one that moves right after the player.
-        val humans = seats.indices.filter { seats[it].human }
+        // Round 1: people first, then the AIs — shuffled under Shuffled order, so no AI is always the
+        // one that moves right after the player. With several people (hot-seat), one is drawn to go
+        // first and the others follow in seat order after it (Design §4.2). One person draws
+        // nothing, so a seed sets up the same game as before hot-seat.
+        val seated = seats.indices.filter { seats[it].human }
+        val draw = if (seated.size > 1) random.nextInt(seated.size) else 0
+        val humans = seated.drop(draw) + seated.take(draw)
         val ais = seats.indices.filter { !seats[it].human }
         val order = humans + if (turnOrder == TurnOrder.Shuffled) ais.shuffled(random) else ais
         val first = order.first()

@@ -69,10 +69,23 @@ fun StackedBar(segments: List<Segment>, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Whose numbers the strength bars show: the person to move, or during AI turns the next person in
+ * this round's order; with every person out, the first one seated. With one person, always them.
+ */
+fun GameState.viewer(): Int? {
+    val people = kingdoms.filter { it.human }.map { it.id }
+    val i = order.indexOf(current).coerceAtLeast(0)
+    return (order.drop(i) + order.take(i)).firstOrNull { it in people && isAlive(it) } ?: people.firstOrNull()
+}
+
+/** More than one person at the table: name whose turn it is (Design §6.1). */
+val GameState.hotSeat: Boolean get() = kingdoms.count { it.human } > 1
+
 /** Kingdoms' shares of production, territory and armies (Status M5: relative strength bars). */
 @Composable
 fun StrengthPanel(game: GameState, modifier: Modifier = Modifier) {
-    val human = game.kingdoms.firstOrNull { it.human }?.id
+    val human = game.viewer()
     val alive = game.alive
     Column(modifier.panel().width(250.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
         MetricRow("Production", { Icon(16.dp) { resourceIcon(Resource.Grain) } }, game, alive, human, { game.growthOf(it) }) { "+$it" }
@@ -133,6 +146,7 @@ fun TurnPanel(game: GameState, onEndTurn: () -> Unit, onSkip: () -> Unit, onMenu
         pactLine(game)?.let { BasicText(it, style = Small) }
         val who = when {
             game.isOver -> "Game over"
+            k.human && game.hotSeat -> "${k.name}, your turn"
             k.human -> "Your turn"
             else -> "${k.name} (${k.difficulty.name.lowercase()}, ${Personality.forSeat(k.id).name}) moves…"
         }
