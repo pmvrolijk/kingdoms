@@ -10,7 +10,8 @@ session. Keep it short — it earns its value by being short.
   also in the macOS Dock. 1k added a **web target** (Kotlin/Wasm) and **GitHub Actions** for
   tests and releases (Design §2.4), and **pacts** against a runaway leader (§4.7), played by the
   user on desktop. Left: performance measurement, the iOS ICU warning. Branch `master`, pushed to
-  GitHub (`origin`, private) since 1l.
+  GitHub (`origin`, private) since 1l. **First release: v1.0.2** (1l), the dmg and APK installed
+  and played by the user.
 - **Modules:** `core`, `composeApp`, `androidApp`, `iosApp` (Design §2.1); `core` and `composeApp`
   also target `wasmJs` (browser app in `wasmJsMain`: `WebSaveStore`, `WebSpeaker`, `index.html`). `core.map` generates
   the map (Design §3); `core.rules` is setup, moves, fatigue, battle, growth, elimination
@@ -46,13 +47,11 @@ session. Keep it short — it earns its value by being short.
   with the `AudioContext` running (not heard), 120 fps. The built site in
   `composeApp/build/dist` predates pacts until rebuilt. Not tried: Safari, Firefox, a phone
   browser, the help screen on the web.
-- **CI:** `.github/workflows/ci.yml` and `release.yml`. The repo is on GitHub since 1l. CI is
-  green after the 1l timeout fix. The release built every file for v1.0.1 but failed to publish
-  (fixed in 1l, not yet re-run). What they call was run locally: the CI test command passes; `packageDmg`
-  with `-Pkingdoms.version=1.2.3` gives `Kingdoms-1.2.3.dmg`; the APK carries versionCode 10203;
-  a release build signed with a throwaway keystore verifies with `apksigner`. Not run locally:
-  `packageDeb` (needs Linux) and the composeApp tests on Linux (fonts may differ; no test
-  compares pixels with text).
+- **CI:** `.github/workflows/ci.yml` and `release.yml`, both green on GitHub. Tag `v1.0.2`
+  published a release with all four files; the user installed the signed APK (P30) and the
+  .dmg (macOS) and both work. **Not tried:** the `.deb` on a Linux machine, the web zip served
+  from the release. The v1.0.1 tag/release failed to publish (fixed in v1.0.2); tags `v0.9.0`
+  and `v1.0.0` also exist on GitHub, from before signing.
 - **Known warning:** the iOS link warns that Compose's bundled ICU data was built for iOS 18.5
   while the deployment target is 16.0. Harmless on the 18.2 simulator; check on an older iOS
   before release, or raise the target.
@@ -83,8 +82,9 @@ session. Keep it short — it earns its value by being short.
   screen). Compose 1.12 restarts `pointerInput` when its lambda changes, so stale tap handlers are
   ruled out. If it recurs: note the turn bar text, whether selection/targets showed, any log line,
   and the terminal output.
-- **GitHub repo:** the user chose a new private GitHub repo; creating it and pushing is theirs.
-  Then: watch the first CI run, and push a test tag (e.g. `v1.0.0`) to see the release.
+- **Going public:** the user will make the repo public. Until then the About panel's Source code
+  link and the README's Releases link 404 for anyone else. Optionally tidy the failed v1.0.1
+  release and the early `v0.9.0`/`v1.0.0` tags first.
 - **Pact strength:** in play the user won a game the pact stood against (round 15) and lost one
   where the pact failed against red; fine so far. If people keep beating pacts easily, the
   levers are the AI's +3 on the target and the 35% trigger (both measurable in the report).
@@ -117,8 +117,9 @@ In order; each milestone ends with something runnable on desktop.
   - [ ] Real-device performance (the headless emulator renders in software; the P30 felt fine but
         nothing was measured), the iOS ICU deployment warning.
   - [x] Web target (1k): Kotlin/Wasm, localStorage saves, Web Audio, favicon. Seen in Chrome.
-  - [x] Distributions (1k): CI on push, release on a `v*` tag (.dmg, .deb, APK, web zip).
-        Written and parts run locally; **first real run pending** the GitHub repo (§2).
+  - [x] Distributions (1k, 1l): CI on push, release on a `v*` tag (.dmg, .deb, APK, web zip).
+        First release v1.0.2; dmg and signed APK checked by the user. .deb and web zip untried.
+  - [x] Licence (AGPL-3.0-or-later), README, About panel (1l).
   - [ ] Optional: host the web build somewhere (GitHub Pages needs a public repo or a paid plan
         for private ones), Safari/Firefox/phone-browser check, an Intel macOS build.
   - [ ] Optional: Android 13 monochrome (themed) icon layer; a defeat sound (not asked for).
@@ -133,14 +134,14 @@ In order; each milestone ends with something runnable on desktop.
 
 Latest first. Keep the last three sessions; condense older ones to a line under "Earlier".
 
-### 2026-10-18 — Session 1l: first CI run
+### 2026-10-18 — Session 1l: first CI run, licence, first release
 
 - The user pushed to GitHub (`pmvrolijk/kingdoms`, private). First CI run: 5 app UI tests
   failed with `UncompletedCoroutinesError` — the four `PlayTest`s and
   `HelpTest.theAiWaitsWhileHelpIsOpen`, the five slowest (22–27 s locally). `runComposeUiTest`
   (v2) defaults to a 60 s real-time limit; the Linux runner draws in software and is slower.
   Fix: `runUiTest` (`UiTests.kt`) with 5 minutes, used by all 8 UI tests; CLAUDE.md rule.
-  Passes locally; **not yet confirmed on CI**. `gh` is not installed here, so I read no CI logs.
+  CI green since. `gh` is not installed here, so I read no CI logs (the user pasted them).
 - **Licence** (user: AGPL since the web version can run as a service; chose 3.0-or-later and
   "Marcel Vrolijk"): `LICENSE` is the FSF text, downloaded from gnu.org with the user's OK;
   `README.md` (what, downloads per platform, build, layout, licence). About panel (`About.kt`,
@@ -156,11 +157,16 @@ Latest first. Keep the last three sessions; condense older ones to a line under 
 - **First release, v1.0.1:** CI green; all four files built (signed `Kingdoms-1.0.1.apk`, 7 MB;
   .dmg 69 MB; `kingdoms_1.0.1_amd64.deb` 53 MB — no `-1`, Design fixed; web zip 4.5 MB). The
   publish step failed: the release already existed (made on GitHub's release page, which also
-  makes the tag). It now uploads to an existing release, or creates one. Not yet re-run.
+  makes the tag). It now uploads to an existing release, or creates one. The user then tagged
+  **v1.0.2**: published, and the user installed and ran the APK and the .dmg — "Working".
 - Choices without the user: About in the settings footer, not the header (it was clipped on a
   phone); British "Licence" on the chip, matching the game's English; no screenshot in the
   README; the Source code link points at the private repo, so it 404s for others until the repo
   is public.
+- No tuning re-run needed (no rule, setup or AI change).
+- **Picking this up:** the user makes the repo public (§2). Then the open M6 items: measure
+  performance on the P30, the iOS ICU warning; optionally try the .deb on Linux and the web zip
+  from the release, and host the web build (GitHub Pages works once the repo is public).
 
 ### 2026-10-17/18 — Session 1k: web target, CI and releases, pacts
 
@@ -250,35 +256,10 @@ Latest first. Keep the last three sessions; condense older ones to a line under 
   P30, the iOS ICU warning (raise the target or check an older iOS), the desktop packaging JDK
   (§2), and a first run on a physical iOS device if one is available.
 
-### 2026-10-16 — Session 1i: autosave/resume, touch tuning, P30 fixes
-
-- User decided: on launch with a save, a **Continue** button (not straight into the game); the
-  save is a **GameState snapshot** (not an action log). Design §6.2, §7.
-- `core`: `@Serializable` on the map and state types, `Save.json`; `SaveTest` round-trips every
-  preset and plays on identically. Save 150 / 225 / 301 KB (Small/Medium/Large), encode < 1 ms,
-  decode 2–3.5 ms on JVM (not measured on a phone). App: `Saves.kt` (`SaveStore`,
-  `FileSaveStore` writes a temp file then moves it atomically), saves after every action, a
-  finished game clears it; Continue restores setup and restart count. Checked on the emulator
-  (kill, relaunch, same board) and by the user on the P30.
-- Hard chip clipped on phones: the panel width was set outside `safeDrawingPadding`, so the
-  cutout squeezed it. Fixed; chips no longer wrap.
-- Touch: zoom limits are relative to the fitted view (0.8×–6×; the old absolute limits allowed
-  only ~3× on a phone), panning keeps the view centre over the board, a finger that just misses
-  the coast takes the majority province within 12 dp, a two-finger touch is never a tap. Bigger
-  chips/buttons; the province card drops its how-to line under 480 dp; Android hides the system
-  bars. `TouchTest`; P30 snapshots (`new-game-p30.png`, `app-p30.png`).
-- User on the P30: province names "dark brown, no halo, not readable". Android's text paint kept
-  the halo's stroke style for the fill pass; `drawStyle = Fill` fixed it (CLAUDE.md rule).
-  Desktop snapshots never showed it. User confirmed the fix on the P30.
-- Not checked: iOS save at runtime; the desktop app by hand; an Android configuration change
-  (no `configChanges`, so the Activity is recreated and returns to the new-game screen with
-  Continue — no loss, but a step). No tuning re-run needed (no rule/setup/AI change).
-- **Picking this up:** the help screen — ask how long it may be and whether it is one page or
-  tabs (rules / movement and attack / defence lines / tactics), then sound effects (§2 questions
-  first). Optional, not asked for: a leader-focus for Normal AI.
-
 ### Earlier
 
+- **Session 1i:** autosave/resume (GameState snapshot, Continue button), touch tuning on the P30
+  (relative zoom limits, near-miss taps), Android text-halo fix (`drawStyle = Fill`).
 - **Session 1h:** new-game screen with seats, colours and difficulty (Easy 14 / Normal 23 / Hard
   34%); "red usually wins" was geography plus a fixed launch seed (now random); a map-generation
   crash on 2 of 3000 seeds fixed (`ManySeedsTest`); markers scale at half the zoom; names when

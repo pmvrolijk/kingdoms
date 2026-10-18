@@ -1,5 +1,6 @@
 # Builds the distributions (Design §2.4). A tag vX.Y.Z publishes them as a GitHub Release with that
-# version; starting it by hand from the Actions tab only builds them, as downloads on the run.
+# version and puts the web version on GitHub Pages; starting it by hand from the Actions tab builds
+# them as downloads on the run and also updates Pages.
 name: Release
 
 on:
@@ -130,6 +131,29 @@ jobs:
           name: dist-web
           path: out/*.zip
           if-no-files-found: error
+      - name: The site for GitHub Pages
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: composeApp/build/dist/wasmJs/productionExecutable
+
+  # The playable web version at https://pmvrolijk.github.io/kingdoms/, from a tag or a run by hand.
+  # Needs Settings → Pages → Source "GitHub Actions", and the github-pages environment must allow
+  # v* tags (it allows only the default branch at first).
+  pages:
+    needs: web
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v5
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')

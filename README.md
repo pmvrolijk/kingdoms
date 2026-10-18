@@ -1,5 +1,7 @@
 # Kingdoms
 
+[![CI](https://github.com/pmvrolijk/kingdoms/actions/workflows/ci.yml/badge.svg)](https://github.com/pmvrolijk/kingdoms/actions/workflows/ci.yml)
+
 A short, cozy, Risk-like strategy game. A small island of provinces and a handful of kingdoms, one of
 them yours. Move armies, take provinces, grow armies at home and march them to the front. The last
 kingdom standing wins. A game against three AI kingdoms takes 15–30 minutes.
@@ -11,7 +13,16 @@ kingdom standing wins. A game against three AI kingdoms takes 15–30 minutes.
 - When one kingdom runs away with the game, the others form a pact against it. That includes you.
 - A tabletop look drawn in code, with generated sound effects and a built-in "How to play".
 
+![A game in round 6: a pact of three kingdoms against the red one, a province selected](docs/screenshots/game.png)
+
+| New game | Up close |
+| --- | --- |
+| ![The new-game screen: map size, seed, turn order and the kingdoms beside a preview of the island](docs/screenshots/new-game.png) | ![Zoomed in on a battle: crossed swords over a captured province, with province names](docs/screenshots/battle.png) |
+
 ## Play
+
+**[Play in your browser](https://pmvrolijk.github.io/kingdoms/)**: the latest release, no install. Needs a browser with
+WebAssembly GC (current Chrome, Firefox or Safari); your game is saved in the browser.
 
 Downloads for each version are on the [Releases](../../releases) page:
 

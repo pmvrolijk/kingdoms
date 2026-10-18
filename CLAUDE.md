@@ -36,6 +36,7 @@ Multiplatform, targeting Android, iOS and desktop (macOS, Linux).
 TUNING=1 ./gradlew :core:jvmTest --tests '*TuningReport*' --rerun -i | grep REPORT   # Design §9 numbers, ~5 min
 TUNING=1 TUNING_QUICK=1 TUNING_VARIANTS=default,none,pact40-33 ./gradlew :core:jvmTest --tests '*TuningReport*' --rerun -i | grep REPORT   # compare rule variants
 ICONS=1 ./gradlew :composeApp:jvmTest --tests '*AppIconTest*'   # re-render the app icons into the platforms (Design §8.1)
+SCREENSHOTS=1 ./gradlew :composeApp:jvmTest --tests '*ScreenshotTest*' --rerun   # README screenshots → docs/screenshots (Design §2.4)
 ./gradlew :androidApp:assembleDebug             # APK → androidApp/build/outputs/apk/debug/
 ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64   # iOS framework without Xcode
 open iosApp/iosApp.xcodeproj                    # iOS app; the build phase calls Gradle

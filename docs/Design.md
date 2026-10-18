@@ -90,8 +90,20 @@ Added 2026-10-17 (user: "support the web target", "distributions in a GitHub Act
   asks on first open), `kingdoms_X.Y.Z_amd64.deb` (Linux), `Kingdoms-X.Y.Z.apk` and
   `Kingdoms-X.Y.Z-web.zip`; a release already made on GitHub's release page for that tag gets the
   files added instead. Started by hand from the Actions tab, it builds the same files as
-  downloads on the run, with the default version, and publishes nothing. CI uses Temurin 21, so
-  Compose's JDK-vendor check passes there.
+  downloads on the run, with the default version, and publishes no release (it does update Pages,
+  below). CI uses Temurin 21, so Compose's JDK-vendor check passes there.
+- **GitHub Pages** (added 2026-10-18, when the repository went public; user: deploy on each release
+  tag): the release's web build is also deployed to https://pmvrolijk.github.io/kingdoms/, so the
+  hosted game is the latest release, not the latest commit. The site works under that sub-path
+  (checked by serving it under `/kingdoms/` locally). Needs, once, in the repository settings:
+  Pages → Source "GitHub Actions", and a `v*` tag rule on the `github-pages` environment (it allows
+  only the default branch at first, so a tag's deploy is refused without it). Saves are per site,
+  so the hosted game keeps its own save under `pmvrolijk.github.io`, beside the user's other pages;
+  the keys are prefixed `kingdoms.`.
+- **Screenshots** in the README come from `ScreenshotTest` (seed 51, round 6, played by the AI): the
+  game with a province selected, the new-game screen, and a battle zoomed in. It runs with the
+  other app tests into `build/screenshots/`; `SCREENSHOTS=1` writes `docs/screenshots/`. Re-run it
+  when the look changes.
 - **Local packaging** needs a JDK Compose accepts (e.g. Temurin as `JAVA_HOME`; the Homebrew JDK
   is refused). The packaged app runs with `--enable-native-access=ALL-UNNAMED`, since newer JDKs
   warn about, and will block, Skia loading its native library.
