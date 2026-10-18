@@ -94,9 +94,10 @@ Added 2026-10-17 (user: "support the web target", "distributions in a GitHub Act
 - **Local packaging** needs a JDK Compose accepts (e.g. Temurin as `JAVA_HOME`; the Homebrew JDK
   is refused). The packaged app runs with `--enable-native-access=ALL-UNNAMED`, since newer JDKs
   warn about, and will block, Skia loading its native library.
-- **Android signing.** With the repository secrets `ANDROID_KEYSTORE_BASE64`,
-  `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` the APK is a signed
-  release build (the build reads `KINGDOMS_KEYSTORE*`/`KINGDOMS_KEY_*` from the environment);
+- **Android signing.** With the secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
+  `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` — environment secrets of the GitHub environment
+  `prod`, which the android job names — the APK is a signed release build (a self-signed RSA 4096
+  key, valid ~27 years, kept by the user outside the repository; `*.jks` is git-ignored) (the build reads `KINGDOMS_KEYSTORE*`/`KINGDOMS_KEY_*` from the environment);
   without them it is a debug APK, `Kingdoms-X.Y.Z-debug.apk`, signed with that runner's throwaway
   key, so it cannot update an earlier one in place.
 - Not built: iOS (needs an Apple developer account and signing secrets), a Windows package.
@@ -430,12 +431,14 @@ The map fills the screen; the HUD sits in the corners on parchment panels.
   provinces), seed (editable, Shuffle for a new one; random on launch), turn order, and the
   kingdoms: colour swatch (tap for the next unused colour), editable name, *You* or an AI
   difficulty, remove; Add a kingdom up to six; **Start** stays pinned at the bottom. On the right a
-  live preview of the actual map with each kingdom's starting territory in its colour. Start is
+  live preview of the actual map with each kingdom's starting territory in its colour. The
+  settings end with the copyright line and an About chip (§6.5). Start is
   disabled, with a reason, when the map is too small for the kingdoms. With a saved game,
   **Continue · round N** (in the player's colour) sits beside Start, which then reads *Start
   new*; starting one replaces the save.
-- **Menu** (in game): Resume, How to play, Restart (same setup, new game seed), New game…, and
-  the sound control (§6.4). AI turns wait while the menu or help is open.
+- **Menu** (in game): Resume, How to play, Restart (same setup, new game seed), New game…, the
+  sound control (§6.4), and the seed with an About chip (§6.5). AI turns wait while the menu, help
+  or About is open.
 - **Result**: Victory / Defeat / "X wins" in the winner's colour, rounds played, Play again,
   New game….
 
@@ -501,6 +504,20 @@ from reference recordings the user chose (only measured, nothing from them ships
   sound, so a quick repeat overlaps), the browser Web Audio (`WebSpeaker`: a buffer per variant,
   rendered on first use, played through a gain node). Browsers allow audio only after the
   player's first tap, so the `AudioContext` is made on the first sound, which is always a click.
+
+### 6.5 About and licence
+
+Decided 2026-10-18 (user): the game is free software under the **GNU AGPL, version 3 or later**,
+© 2026 Marcel Vrolijk, since the web version can run as a service. `LICENSE` holds the FSF text
+verbatim; `README.md` gives the notice.
+
+- **About** (from the end of the new-game settings and the in-game menu): a small panel with the name, the
+  copyright line, one sentence on the licence and the lack of warranty, and two links, **Licence**
+  (gnu.org's AGPL page) and **Source code** (the GitHub repository), opened in the browser.
+  Taps do not reach what is under it.
+- **Packages.** The macOS app's `NSHumanReadableCopyright` carries the copyright line. The
+  licence is not attached to the packages: on macOS it becomes an "Agree" dialog when the .dmg
+  opens, and the AGPL asks for no acceptance just to receive a copy.
 
 ## 7. Save and resume
 

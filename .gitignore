@@ -17,3 +17,8 @@ DerivedData/
 
 # OS
 .DS_Store
+
+# Signing keys and other local-only files: never commit these
+/local/
+*.jks
+*.keystore

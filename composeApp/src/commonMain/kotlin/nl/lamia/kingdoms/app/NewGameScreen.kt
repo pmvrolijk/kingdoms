@@ -69,6 +69,7 @@ fun NewGameScreen(
     resume: GameState? = null,
     onContinue: () -> Unit = {},
     onHelp: () -> Unit = {},
+    onAbout: () -> Unit = {},
 ) {
     val map = remember(setup.config) { MapGenerator.generate(setup.config) }
     val preview = remember(map, setup.seats, setup.turnOrder) {
@@ -155,6 +156,12 @@ fun NewGameScreen(
                     "${setup.seats.size} kingdoms need at least ${setup.seats.size * MapConfig.MIN_PROVINCES_PER_KINGDOM} provinces",
                     style = Small.copy(color = Palette.kingdom(1).darker(0.2f)),
                 )
+            }
+
+            // At the end of the list: the header has no room for it on a phone (Design §6.5).
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                BasicText(COPYRIGHT, style = Small.copy(color = Palette.Ink.copy(alpha = 0.6f)), modifier = Modifier.weight(1f))
+                Chip("About", small = true, onClick = onAbout)
             }
           }
           Spacer(Modifier.height(10.dp))

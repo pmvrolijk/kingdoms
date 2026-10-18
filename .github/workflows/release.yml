@@ -74,6 +74,8 @@ jobs:
     needs: [test, version]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # The signing secrets are environment secrets of "prod"; a job only sees them when it names it.
+    environment: prod
     env:
       VERSION: ${{ needs.version.outputs.version }}
       KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

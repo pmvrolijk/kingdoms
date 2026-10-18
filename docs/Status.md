@@ -9,8 +9,8 @@ session. Keep it short — it earns its value by being short.
   screen, sound effects and app icons (1j) — all checked by the user on a Huawei P30, the icon
   also in the macOS Dock. 1k added a **web target** (Kotlin/Wasm) and **GitHub Actions** for
   tests and releases (Design §2.4), and **pacts** against a runaway leader (§4.7), played by the
-  user on desktop. Left: performance measurement, the iOS ICU warning. Branch `master`; 1k is
-  committed (098ad34, 52ce844) except this close-out of Status.md. No git remote yet.
+  user on desktop. Left: performance measurement, the iOS ICU warning. Branch `master`, pushed to
+  GitHub (`origin`, private) since 1l.
 - **Modules:** `core`, `composeApp`, `androidApp`, `iosApp` (Design §2.1); `core` and `composeApp`
   also target `wasmJs` (browser app in `wasmJsMain`: `WebSaveStore`, `WebSpeaker`, `index.html`). `core.map` generates
   the map (Design §3); `core.rules` is setup, moves, fatigue, battle, growth, elimination
@@ -24,7 +24,7 @@ session. Keep it short — it earns its value by being short.
   volume and mute (§6.4). App icon drawn by the game for every platform (§8.1). Pacts against a
   runaway leader and a hinterland-first setup (§4.1, §4.7). 79 core tests (77 common — on JVM,
   Android host, iOS simulator and Wasm/Node — plus JVM-only `ManySeedsTest` over 9000 maps and
-  `TuningReport`); composeApp has 34: 10 snapshot, 4 play, 4 help, 5 sound, 5 icon, 2 picker,
+  `TuningReport`); composeApp has 37: 10 snapshot, 4 play, 4 help, 5 sound, 5 icon, 3 about, 2 picker,
   2 touch, 2 save-store (~3 min).
 - **M1 verified:** 14 property tests over 34 maps (10 seeds × 3 presets, plus 6, 120, no-sea and
   70%-sea/all-features) pass on JVM, Android host and iOS simulator: exact province count,
@@ -46,8 +46,9 @@ session. Keep it short — it earns its value by being short.
   with the `AudioContext` running (not heard), 120 fps. The built site in
   `composeApp/build/dist` predates pacts until rebuilt. Not tried: Safari, Firefox, a phone
   browser, the help screen on the web.
-- **CI:** `.github/workflows/ci.yml` and `release.yml` are written but **have never run** (no
-  GitHub repo yet). What they call was run locally: the CI test command passes; `packageDmg`
+- **CI:** `.github/workflows/ci.yml` and `release.yml`. The repo is on GitHub since 1l; the first
+  CI run failed 5 slow UI tests on a timeout (fixed in 1l, not yet re-run); `release.yml` has
+  not run. What they call was run locally: the CI test command passes; `packageDmg`
   with `-Pkingdoms.version=1.2.3` gives `Kingdoms-1.2.3.dmg`; the APK carries versionCode 10203;
   a release build signed with a throwaway keystore verifies with `apksigner`. Not run locally:
   `packageDeb` (needs Linux) and the composeApp tests on Linux (fonts may differ; no test
@@ -84,9 +85,6 @@ session. Keep it short — it earns its value by being short.
   and the terminal output.
 - **GitHub repo:** the user chose a new private GitHub repo; creating it and pushing is theirs.
   Then: watch the first CI run, and push a test tag (e.g. `v1.0.0`) to see the release.
-- **Android signing key:** without the four `ANDROID_*` secrets (Design §2.4) releases carry a
-  debug APK that cannot update the previous one. The user makes the keystore (and must keep it:
-  a lost key means a new app for Play) and adds the secrets.
 - **Pact strength:** in play the user won a game the pact stood against (round 15) and lost one
   where the pact failed against red; fine so far. If people keep beating pacts easily, the
   levers are the AI's +3 on the target and the 35% trigger (both measurable in the report).
@@ -134,6 +132,31 @@ In order; each milestone ends with something runnable on desktop.
 ## 4. Handover
 
 Latest first. Keep the last three sessions; condense older ones to a line under "Earlier".
+
+### 2026-10-18 — Session 1l: first CI run
+
+- The user pushed to GitHub (`pmvrolijk/kingdoms`, private). First CI run: 5 app UI tests
+  failed with `UncompletedCoroutinesError` — the four `PlayTest`s and
+  `HelpTest.theAiWaitsWhileHelpIsOpen`, the five slowest (22–27 s locally). `runComposeUiTest`
+  (v2) defaults to a 60 s real-time limit; the Linux runner draws in software and is slower.
+  Fix: `runUiTest` (`UiTests.kt`) with 5 minutes, used by all 8 UI tests; CLAUDE.md rule.
+  Passes locally; **not yet confirmed on CI**. `gh` is not installed here, so I read no CI logs.
+- **Licence** (user: AGPL since the web version can run as a service; chose 3.0-or-later and
+  "Marcel Vrolijk"): `LICENSE` is the FSF text, downloaded from gnu.org with the user's OK;
+  `README.md` (what, downloads per platform, build, layout, licence). About panel (`About.kt`,
+  Design §6.5) from the end of the new-game settings and the in-game menu, with Licence and
+  Source code links; `AboutTest` (3) with a fake `UriHandler`, snapshot `about.png`. The macOS
+  app carries the copyright line; `licenseFile` was tried and dropped — it made the .dmg show an
+  "Agree" dialog. Compiles for web, Android and iOS; the links were only tested with the fake
+  handler, not opened on a device.
+- **Android signing:** the user made a self-signed keystore (kept in the git-ignored `local/`)
+  and added the four secrets to the GitHub environment `prod`; the android job now names
+  `environment: prod` (environment secrets are invisible otherwise). `*.jks`/`*.keystore`
+  git-ignored. Not yet run: the first tag will show whether the signed APK builds.
+- Choices without the user: About in the settings footer, not the header (it was clipped on a
+  phone); British "Licence" on the chip, matching the game's English; no screenshot in the
+  README; the Source code link points at the private repo, so it 404s for others until the repo
+  is public.
 
 ### 2026-10-17/18 — Session 1k: web target, CI and releases, pacts
 

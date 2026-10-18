@@ -13,7 +13,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
-import androidx.compose.ui.test.v2.runComposeUiTest
 import nl.lamia.kingdoms.core.map.GameMap
 import nl.lamia.kingdoms.core.map.MapConfig
 import nl.lamia.kingdoms.core.map.MapGenerator
@@ -55,7 +54,7 @@ class PlayTest {
      * saved one — a new game from the same setup has the same seed and map, so check the round.
      */
     @Test
-    fun continueResumesTheSavedGame() = runComposeUiTest {
+    fun continueResumesTheSavedGame() = runUiTest {
         val map = MapGenerator.generate(MapConfig.of(MapSize.Medium, seed = 1))
         val store = MemorySaveStore()
         var launch by mutableStateOf(0)
@@ -80,7 +79,7 @@ class PlayTest {
     }
 
     /** The full App from a known setup, after [setup] clicks; the start mirrors what App creates. */
-    private fun playApp(order: TurnOrder, restarts: Int, playing: Boolean, setup: ComposeUiTest.() -> Unit) = runComposeUiTest {
+    private fun playApp(order: TurnOrder, restarts: Int, playing: Boolean, setup: ComposeUiTest.() -> Unit) = runUiTest {
         val map = MapGenerator.generate(MapConfig.of(MapSize.Medium, seed = 1))
         var state = NewGame.create(map, kingdoms = 4, seed = 1L + restarts, turnOrder = order)
         setContent { App(Setup(), playing = playing, onGameChange = { state = it }) }
@@ -89,7 +88,7 @@ class PlayTest {
         playTurns(map, expected = NewGame.create(map, kingdoms = 4, seed = 1L + restarts, turnOrder = order)) { state }
     }
 
-    private fun play(order: TurnOrder) = runComposeUiTest {
+    private fun play(order: TurnOrder) = runUiTest {
         val map = MapGenerator.generate(MapConfig.of(MapSize.Medium, seed = 1))
         val start = NewGame.create(map, kingdoms = 4, seed = 1, turnOrder = order)
         var state: GameState = start

@@ -12,7 +12,6 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
-import androidx.compose.ui.test.v2.runComposeUiTest
 import nl.lamia.kingdoms.core.map.MapConfig
 import nl.lamia.kingdoms.core.map.MapGenerator
 import nl.lamia.kingdoms.core.map.MapSize
@@ -29,7 +28,7 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class PickerTest {
     @Test
-    fun longPressWithTheMouseOpensThePicker() = runComposeUiTest {
+    fun longPressWithTheMouseOpensThePicker() = runUiTest {
         val map = MapGenerator.generate(MapConfig.of(MapSize.Medium, seed = 1))
         val start = NewGame.create(map, kingdoms = 4, seed = 1)
         var state: GameState = start
@@ -50,7 +49,7 @@ class PickerTest {
     }
 
     @Test
-    fun rightClickOpensThePickerToo() = runComposeUiTest {
+    fun rightClickOpensThePickerToo() = runUiTest {
         val map = MapGenerator.generate(MapConfig.of(MapSize.Medium, seed = 1))
         val start = NewGame.create(map, kingdoms = 4, seed = 1)
         var state: GameState = start

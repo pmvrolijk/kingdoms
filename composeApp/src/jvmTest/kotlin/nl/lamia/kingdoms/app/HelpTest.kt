@@ -12,7 +12,6 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.v2.runComposeUiTest
 import nl.lamia.kingdoms.core.rules.GameState
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,7 +23,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class HelpTest {
     @Test
-    fun opensFromTheNewGameScreenAndCloses() = runComposeUiTest {
+    fun opensFromTheNewGameScreenAndCloses() = runUiTest {
         // The scenes animate forever, so the clock never idles by itself.
         mainClock.autoAdvance = false
         setContent { App(Setup()) }
@@ -42,7 +41,7 @@ class HelpTest {
 
     /** With help open from the in-game menu, the AI waits; closing both lets it play on. */
     @Test
-    fun theAiWaitsWhileHelpIsOpen() = runComposeUiTest {
+    fun theAiWaitsWhileHelpIsOpen() = runUiTest {
         var state: GameState? = null
         mainClock.autoAdvance = false
         setContent { App(Setup(), playing = true, onGameChange = { state = it }) }

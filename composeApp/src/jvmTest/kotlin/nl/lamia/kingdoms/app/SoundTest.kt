@@ -13,7 +13,6 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.test.v2.runComposeUiTest
 import nl.lamia.kingdoms.core.map.MapConfig
 import nl.lamia.kingdoms.core.map.MapGenerator
 import nl.lamia.kingdoms.core.map.MapSize
@@ -118,7 +117,7 @@ class SoundTest {
      * mutes, muted means silent, and the setting is there after a relaunch.
      */
     @Test
-    fun theMenuSetsVolumeAndMuteAndTheyAreKept() = runComposeUiTest {
+    fun theMenuSetsVolumeAndMuteAndTheyAreKept() = runUiTest {
         val played = mutableListOf<Pair<Sound, Float>>()
         val speaker = Speaker { sound, _, volume -> played += sound to volume }
         val settings = MemorySaveStore()

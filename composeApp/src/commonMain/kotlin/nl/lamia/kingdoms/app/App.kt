@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -47,6 +48,7 @@ fun App(
     var saved by remember { mutableStateOf(store.load()) }
     var menuOpen by remember { mutableStateOf(false) }
     var helpOpen by remember { mutableStateOf(false) }
+    var aboutOpen by remember { mutableStateOf(false) }
 
     fun keep(state: GameState) {
         if (state.isOver) {
@@ -83,6 +85,7 @@ fun App(
                         }
                     },
                     onHelp = { helpOpen = true },
+                    onAbout = { aboutOpen = true },
                 )
             } else {
                 fun newGame() {
@@ -104,7 +107,7 @@ fun App(
                         onGameChange(it)
                     },
                     onMenu = { menuOpen = !menuOpen },
-                    paused = menuOpen || helpOpen,
+                    paused = menuOpen || helpOpen || aboutOpen,
                 )
                 if (menuOpen) {
                     Column(
@@ -118,14 +121,19 @@ fun App(
                         ActionButton("Restart", Palette.Ink.lighter(0.3f), onClick = ::restart)
                         ActionButton("New game…", Palette.Ink.lighter(0.3f), onClick = ::newGame)
                         SoundControl(sounds, Modifier.fillMaxWidth())
-                        BasicText(
-                            "seed ${setup.seed} · ${game.map.provinces.size} provinces",
-                            style = Small.copy(color = Palette.Ink.copy(alpha = 0.6f)),
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            BasicText(
+                                "seed ${setup.seed} · ${game.map.provinces.size} provinces",
+                                style = Small.copy(color = Palette.Ink.copy(alpha = 0.6f)),
+                                modifier = Modifier.weight(1f),
+                            )
+                            Chip("About", small = true) { aboutOpen = true }
+                        }
                     }
                 }
             }
             if (helpOpen) HelpScreen(onClose = { helpOpen = false }, Modifier.fillMaxSize())
+            if (aboutOpen) AboutScreen(onClose = { aboutOpen = false }, Modifier.fillMaxSize())
         }
     }
 }

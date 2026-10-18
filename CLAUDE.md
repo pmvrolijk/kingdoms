@@ -74,6 +74,8 @@ xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
   re-runs the land's draw (all props) every frame (Design §8).
 - **A UI test that shows the help screen sets `mainClock.autoAdvance = false`** and advances the
   clock by hand: the scenes animate forever, so `waitForIdle` and auto-advance hang the test.
+- **App UI tests start with `runUiTest`, not `runComposeUiTest`.** The latter gives up after 60 s
+  of real time, which the play tests exceed on GitHub's Linux runner.
 - **Web code calls JavaScript only from `wasmJsMain`** (`js("…")` in top-level functions), behind
   the same `SaveStore`/`Speaker` interfaces as the other platforms.
 - **Release files come from `.github/workflows/release.yml`.** Change packaging there and in the
